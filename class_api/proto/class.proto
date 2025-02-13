@@ -1,0 +1,157 @@
+syntax = "proto3";
+option go_package = ".ClassProto";
+package class;
+
+service Class {
+  rpc GetCourseList (CourseFilterRequest) returns (CourseListResponse);
+  rpc GetCourseDetail (CourseDetailRequest) returns (CourseInfoResponse);
+  rpc CreateCourse (CreateCourseRequest) returns (CreateCourseResponse);
+  rpc UpdateCourse (UpdateCourseRequest) returns (Empty);
+  rpc DeleteCourse (DeleteCourseRequest) returns (Empty);
+
+  rpc GetLessonList (LessonFilterRequest) returns (LessonListResponse);
+  rpc CreateLesson (CreateLessonRequest) returns (CreateLessonResponse);
+  rpc CreateLessonInBatch (CreateLessonBatchRequest) returns (CreateLessonBatchResponse);
+  rpc UpdateLesson (UpdateLessonRequest) returns (Empty);
+  rpc DeleteLesson (DeleteLessonRequest) returns (Empty);
+  rpc GetLessonDetail (LessonDetailRequest) returns (LessonInfoResponse);
+  rpc DeleteLessonInBatch (DeleteLessonInBatchRequest) returns (Empty);
+}
+
+message Empty {}
+
+message LessonDetailRequest {
+  int32 Id = 1;
+}
+
+message DeleteLessonInBatchRequest {
+  repeated int32 Ids = 1;
+  int32 CourseId = 2;
+  int32 UserId = 3;
+}
+
+message CreateLessonBatchRequest{
+  int32 CourseId = 1;
+  int32 UserId = 2;
+  int32 BeginWeek = 3;
+  int32 EndWeek = 4;
+  int32 DayOfWeek = 5;
+  int32 LessonNum = 6;
+  string Begin = 7;
+  string End = 8;
+}
+
+message CreateLessonBatchResponse{
+  repeated int32 Ids = 1;
+}
+
+message CourseDetailRequest {
+  int32 Id = 1;
+}
+
+message UpdateLessonRequest {
+  int32 Id = 1;
+  string Begin = 2;
+  string End = 3;
+}
+
+message DeleteLessonRequest {
+  int32 Id = 1;
+}
+
+message CreateLessonRequest {
+  int32 CourseId = 1;
+  int32 WeekNum = 2;
+  int32 DayOfWeek = 3;
+  int32 LessonNum = 4;
+  string Begin = 5;
+  string End = 6;
+  int32 UserId = 7;
+}
+
+message CreateLessonResponse {
+  int32 id = 1;
+}
+
+message LessonFilterRequest {
+  int32 CourseId = 1;
+  int32 WeekNum = 2;
+  int32 DayOfWeek = 3;
+  int32 Term = 4;
+  int32 UserId = 5;
+}
+
+message LessonListResponse {
+  int32 Total = 1;
+  repeated LessonInfoResponse data = 2;
+}
+
+message LessonInfoResponse {
+  int32 Id = 1;
+  int32 CourseId = 2;
+  int32 WeekNum = 3;
+  int32 DayOfWeek = 4;
+  int32 LessonNum = 5;
+  string Begin = 6;
+  string End = 7;
+  CourseInfoResponse course = 8;
+  int32 Term = 9;
+  int32 UserId = 10;
+}
+
+message CourseFilterRequest {
+  string Name = 1;
+  string Type = 2;
+  int32 Term = 3;
+  string Teacher = 4;
+  int32 PageNum = 5;
+  int32 PageSize = 6;
+  int32 UserId = 7;
+}
+
+message CourseListResponse {
+  int32 Total = 1;
+  repeated CourseInfoResponse data = 2;
+}
+
+message DeleteCourseRequest {
+  int32 id = 1;
+}
+
+message CourseInfoResponse {
+  int32 Id = 1;
+  string Name = 2;
+  string Type = 3;
+  string CourseSn = 4;
+  int32 Term = 5;
+  int32 LessonTotal = 6;
+  string Desc = 7;
+  string Image = 8;
+  string Teacher = 9;
+  float Credit = 10;
+  int32 UserId = 11;
+}
+
+message UpdateCourseRequest {
+  int32 id = 1;
+  string Name = 2;
+  string Desc = 3;
+  string Image = 4;
+  string Teacher = 5;
+  float Credit = 6;
+}
+
+message CreateCourseRequest{
+  string Name = 1;
+  string Type = 2;
+  int32 Term = 3;
+  string Desc = 4;
+  string Image = 5;
+  float Credit = 6;
+  string Teacher = 7;
+  int32 UserId = 8;
+}
+
+message CreateCourseResponse{
+  int32 Id = 1;
+}

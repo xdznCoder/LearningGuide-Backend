@@ -1,0 +1,1 @@
+protoc -I . class.proto --go_out=. --go-grpc_out=.

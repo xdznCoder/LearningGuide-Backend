@@ -1,0 +1,5 @@
+host: '8.137.23.119'
+port: 8848
+namespace: 'b3f6dc1e-21d9-4538-b670-fd8c14ab6e3c'
+dataId: 'class_srv'
+group: 'Debug'

@@ -1,0 +1,276 @@
+syntax = "proto3";
+option go_package = ".FileProto";
+package file;
+
+service file{
+  rpc CreateFile (CreateFileRequest) returns (CreateFileResponse);
+  rpc GetFileDetail (FileDetailRequest) returns (FileInfoResponse);
+  rpc FileList (FileFilterRequest) returns (FileListResponse);
+  rpc UpdateFile (UpdateFileRequest) returns (Empty);
+  rpc DeleteFile (DeleteFileRequest) returns (Empty);
+
+  rpc CreateSession (CreateSessionRequest) returns (CreateSessionResponse);
+  rpc SessionList (SessionListRequest) returns (SessionListResponse);
+  rpc DeleteSession (DeleteSessionRequest) returns (Empty);
+  rpc NewMessage (NewMessageRequest) returns (NewMessageResponse);
+  rpc MessageList(MessageListRequest) returns (MessageListResponse);
+
+  rpc NewNoun (NewNounRequest) returns (NewNounResponse);
+  rpc NounList (NounListRequest) returns (NounListResponse);
+  rpc GetNounDetail (NounDetailRequest) returns (NounInfoResponse);
+  rpc DeleteNoun (DeleteNounRequest) returns (Empty);
+
+  rpc NewExercise (NewExerciseRequest) returns (NewExerciseResponse);
+  rpc UpdateExercise (UpdateExerciseRequest) returns (Empty);
+  rpc ExerciseList (ExerciseListRequest) returns (ExerciseListResponse);
+  rpc GetExerciseDetail (ExerciseDetailRequest) returns (ExerciseInfoResponse);
+  rpc DeleteExercise (DeleteExerciseRequest) returns (Empty);
+
+  rpc NewSummary (NewSummaryRequest) returns (NewSummaryResponse);
+  rpc SummaryList (SummaryListRequest) returns (SummaryListResponse);
+  rpc GetSummary (GetSummaryRequest) returns (SummaryInfoResponse);
+}
+
+message NewSummaryResponse {
+  int32 Id = 1;
+}
+
+message NewSummaryRequest {
+  int32 CourseID = 1;
+  string ISOWeek = 2;
+}
+
+message SummaryListRequest {
+  string Year = 1;
+  int32 CourseId = 2;
+  int32 PageNum = 3;
+  int32 PageSize = 4;
+}
+
+message SummaryListResponse {
+  int32 Total = 1;
+  repeated SummaryInfoResponse data = 2;
+}
+
+message GetSummaryRequest {
+  int32 Id = 1;
+}
+
+message SummaryInfoResponse {
+  int32 Id = 1;
+  string WeekID = 2;
+  int32 CourseID = 3;
+  repeated int32 ExerciseDone = 4;
+  repeated float AccuracyRate = 5;
+  int32 SessionNum = 6;
+  int32 MessageNum = 7;
+  int32 NounNum = 8;
+}
+
+message DeleteExerciseRequest {
+  int32 Id = 1;
+}
+
+message ExerciseListResponse {
+  int32 Total = 1;
+  repeated ExerciseInfoResponse data = 2;
+}
+
+message ExerciseDetailRequest {
+  int32 Id = 1;
+}
+
+message ExerciseInfoResponse {
+  int32 CourseId = 1;
+  string Question = 2;
+  string SectionA = 3;
+  string SectionB = 4;
+  string SectionC = 5;
+  string SectionD = 6;
+  string Answer = 7;
+  string Reason = 8;
+  string IsRight = 9;
+  int32 Id = 10;
+}
+
+message ExerciseListRequest {
+  int32 CourseId = 1;
+  string Question = 2;
+  string IsRight = 3;
+  int32 PageNum = 4;
+  int32 PageSize = 5;
+}
+
+message UpdateExerciseRequest {
+  string IsRight = 1;
+  int32 Id = 2;
+}
+
+message NewExerciseResponse {
+  int32 Id = 1;
+}
+
+message NewExerciseRequest {
+  int32 CourseId = 1;
+  string Question = 2;
+  string SectionA = 3;
+  string SectionB = 4;
+  string SectionC = 5;
+  string SectionD = 6;
+  string Answer = 7;
+  string Reason = 8;
+}
+
+message NounDetailRequest {
+  int32 Id = 1;
+}
+
+message DeleteNounRequest {
+  int32 Id = 1;
+}
+
+message UpdateNounRequest {
+  int32 Id = 1;
+  string Content = 2;
+}
+
+message NounListResponse {
+  int32 Total = 1;
+  repeated NounInfoResponse data = 2;
+}
+
+message NounInfoResponse {
+  int32 Id = 1;
+  string Name = 2;
+  string Content = 3;
+  int32 CourseId = 4;
+}
+
+message NounListRequest {
+  string Name = 1;
+  int32 CourseId = 2;
+  int32 PageNum = 3;
+  int32 PageSize = 4;
+}
+
+message NewNounRequest {
+  string Name = 1;
+  string Content = 2;
+  int32 CourseId = 3;
+}
+
+message NewNounResponse {
+  int32 Id = 1;
+}
+
+message DeleteSessionRequest {
+  int32 Id = 1;
+}
+
+message SessionListResponse {
+  int32 Total = 1;
+  repeated SessionInfoResponse data = 2;
+}
+
+message SessionInfoResponse {
+  int32 Id = 1;
+  string Uuid = 2;
+}
+
+message SessionListRequest {
+  int32 CourseId = 1;
+  int32 PageSize = 2;
+  int32 PageNum = 3;
+}
+
+message MessageListRequest {
+  int32 SessionId = 1;
+  int32 PageSize = 2;
+  int32 PageNum = 3;
+}
+
+message MessageListResponse {
+  int32 Total = 1;
+  repeated MessageInfoResponse data = 2;
+}
+
+message MessageInfoResponse {
+  int32 Id = 1;
+  string Content = 2;
+  int32 SessionId = 3;
+  int32 Type = 4;
+  string Speaker = 5;
+}
+
+message NewMessageResponse {
+  int32 Id = 1;
+}
+
+message NewMessageRequest {
+  string Content = 1;
+  int32 Type = 2;
+  int32 SessionId = 3;
+  string Speaker = 4;
+}
+
+message CreateSessionRequest {
+  int32 CourseId = 1;
+}
+
+message CreateSessionResponse {
+  int32 Id = 1;
+}
+
+message Empty {}
+
+message UpdateFileRequest {
+  int32 Id = 1;
+  string Desc = 2;
+}
+
+message DeleteFileRequest {
+  int32 Id = 1;
+}
+
+message CreateFileRequest {
+  string FileName = 1;
+  string FileType = 2;
+  int64 FileSize = 3;
+  string OssUrl = 4;
+  string Desc = 5;
+  int32 UserId = 6;
+  int32 CourseId = 7;
+}
+
+message CreateFileResponse {
+  int32 Id = 1;
+}
+
+message FileDetailRequest {
+  int32 Id = 1;
+}
+
+message FileInfoResponse {
+  int32 Id = 1;
+  string FileName = 2;
+  string FileType = 3;
+  int64 FileSize = 4;
+  string OssUrl = 5;
+  string Desc = 6;
+  int32 UserId = 7;
+  int32 CourseId = 8;
+}
+
+message FileFilterRequest {
+  string FileName = 1;
+  string FileType = 2;
+  int32 UserId = 3;
+  int32 PageNum = 4;
+  int32 PageSize = 5;
+  int32 CourseId = 6;
+}
+
+message FileListResponse {
+  int32 Total = 1;
+  repeated FileInfoResponse data = 2;
+}
