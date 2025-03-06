@@ -3,3 +3,4 @@ test
 dump.rdb
 .idea
 *.yaml
+build
