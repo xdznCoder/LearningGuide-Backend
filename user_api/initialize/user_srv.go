@@ -3,7 +3,7 @@ package initialize
 import (
 	"LearningGuide/user_api/global"
 	"LearningGuide/user_api/middlewares"
-	proto "LearningGuide/user_api/proto/.UserProto"
+	proto "LearningGuide/user_api/proto/userProto"
 	"fmt"
 	_ "github.com/mbobakov/grpc-consul-resolver"
 	"github.com/opentracing/opentracing-go"

@@ -10,9 +10,9 @@ import (
 
 func InitRedis() {
 	rdb := redis.NewClient(&redis.Options{
-		Addr: fmt.Sprintf("%s:%d", global.ServerConfig.Redis.Host, global.ServerConfig.Redis.Port),
-		DB:   int(global.ServerConfig.Redis.DB),
-		// Password: global.ServerConfig.Redis.Password,
+		Addr:     fmt.Sprintf("%s:%d", global.ServerConfig.Redis.Host, global.ServerConfig.Redis.Port),
+		DB:       int(global.ServerConfig.Redis.DB),
+		Password: global.ServerConfig.Redis.Password,
 	})
 	if rdb.Ping(context.Background()).Err() != nil {
 		zap.S().Panicw("redis init failed", "err", "redis init failed")

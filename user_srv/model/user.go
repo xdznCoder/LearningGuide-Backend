@@ -24,3 +24,7 @@ type User struct {
 	Image    string     `gorm:"type:varchar(200)" json:"image"`
 	Role     int        `gorm:"column:role;default:1;type:int" json:"role"`
 }
+
+func (User) TableName() string {
+	return "user"
+}

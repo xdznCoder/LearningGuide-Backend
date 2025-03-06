@@ -1,5 +1,0 @@
-host: '8.137.23.119'
-port: 8848
-namespace: 'bc3ede21-3f1d-4df1-ac2f-4b29ff95dd12'
-dataId: 'file_api'
-group: 'Debug'

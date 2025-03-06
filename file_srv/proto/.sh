@@ -1,1 +1,0 @@
-protoc -I . file.proto --go_out=. --go-grpc_out=.

@@ -229,7 +229,7 @@ func SendMessage(c *gin.Context) {
 		ossClient := getOssClient(global.ServerConfig.AliyunOss)
 
 		result, err := ossClient.GetObject(context.TODO(), &oss.GetObjectRequest{
-			Bucket: oss.Ptr(global.ServerConfig.AliyunOss.BucketName),
+			Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
 			Key:    oss.Ptr(resp.OssUrl),
 		})
 
@@ -272,12 +272,15 @@ func SendMessage(c *gin.Context) {
 		}
 	}
 
-	_, err = global.FileSrvClient.NewMessage(ctx, &FileProto.NewMessageRequest{
+	if _, err = global.FileSrvClient.NewMessage(ctx, &FileProto.NewMessageRequest{
 		Content:   message.Content,
 		Type:      int32(message.Type),
 		SessionId: message.SessionId,
 		Speaker:   "user",
-	})
+	}); err != nil {
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
+		return
+	}
 
 	_, err = global.FileSrvClient.NewMessage(ctx, &FileProto.NewMessageRequest{
 		Content:   resp.String(),

@@ -1,1 +1,0 @@
-protoc -I . post.proto --go_out=. --go-grpc_out=.

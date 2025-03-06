@@ -1,31 +1,28 @@
 package main
 
 import (
-	"LearningGuide/post_api/config"
 	"LearningGuide/post_api/global"
 	"LearningGuide/post_api/initialize"
 	PostProto "LearningGuide/post_api/proto/.PostProto"
-	UserProto "LearningGuide/post_api/proto/.UserProto"
 	"LearningGuide/post_api/router"
+	"flag"
 	"github.com/OuterCyrex/Gorra/GorraAPI"
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 )
 
+var configFile = flag.String("f", "file_api/config/config-debug.yaml", "the config file")
+
 func main() {
+	flag.Parse()
+
 	// 初始化日志
 	logger, _ := zap.NewDevelopment()
 	zap.ReplaceGlobals(logger)
 
 	// 初始化设置
-	c := config.MainConfig{}
 
-	cf, err := GorraAPI.InitConfig("post_api/config/config.yaml", &c)
-	if err != nil {
-		zap.S().Panicf("init config error: %s", err.Error())
-	}
-
-	global.ServerConfig = cf.(config.MainConfig)
+	global.InitConfig(*configFile)
 
 	// 初始化链路追踪
 	tracer, closer := GorraAPI.InitTracer(global.ServerConfig.Name, global.ServerConfig.Jaeger.Host, global.ServerConfig.Jaeger.Port)
@@ -33,11 +30,7 @@ func main() {
 	defer closer.Close()
 
 	// 初始化rpc连接
-	postConn, err := GorraAPI.GetSrvConnection(14, cf, global.ServerConfig.SrvList[0])
-	if err != nil {
-		zap.S().Panicf("get connection error: %s", err.Error())
-	}
-	userConn, err := GorraAPI.GetSrvConnection(14, cf, global.ServerConfig.SrvList[0])
+	postConn, err := GorraAPI.GetSrvConnection(14, global.ServerConfig, global.ServerConfig.SrvList[0])
 	if err != nil {
 		zap.S().Panicf("get connection error: %s", err.Error())
 	}
@@ -46,7 +39,6 @@ func main() {
 	initialize.InitRedis()
 
 	global.PostSrvClient = PostProto.NewPostClient(postConn)
-	global.UserSrvClient = UserProto.NewUserClient(userConn)
 
 	// 初始化路由
 	r := GorraAPI.KeepAliveRouters("v1",
@@ -57,7 +49,7 @@ func main() {
 	)
 
 	// 启动路由服务
-	err = GorraAPI.RunRouter(r, cf)
+	err = GorraAPI.RunRouter(r, global.ServerConfig)
 
 	if err != nil {
 		zap.S().Panicf("Run Router Failed: %v", err)

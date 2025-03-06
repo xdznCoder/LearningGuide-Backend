@@ -10,8 +10,8 @@ type MainConfig struct {
 	Port      int64                 `json:"port"`
 	Redis     RedisConfig           `json:"redis"`
 	SrvList   []string              `json:"srvList"`
-	AliyunOss OssConfig             `json:"aliyun_oss"`
-	ChatGLM   ChatGlmConfig         `json:"chat_glm"`
+	AliyunOss OssConfig             `json:"aliyunOss"`
+	ChatGLM   ChatGlmConfig         `json:"chatGlm"`
 	Jaeger    JaegerConfig          `json:"jaeger"`
 	Tags      []string              `json:"tags"`
 }
@@ -29,15 +29,16 @@ type RedisConfig struct {
 }
 
 type OssConfig struct {
-	Region     string `json:"region"`
-	BucketName string `json:"bucket_name"`
-	AccessKey  string `json:"access_key"`
-	SecretKey  string `json:"secret_key"`
-	EndPoint   string `json:"end_point"`
+	Region            string `json:"region"`
+	FileBucketName    string `json:"fileBucketName"`
+	PictureBucketName string `json:"pictureBucketName"`
+	AccessKey         string `json:"accessKey"`
+	SecretKey         string `json:"secretKey"`
+	EndPoint          string `json:"endPoint"`
 }
 
 type ChatGlmConfig struct {
-	AccessKey string `json:"access_key"`
+	AccessKey string `json:"accessKey"`
 }
 
 func (c MainConfig) GetRegistryInfo() GorraAPI.RegistryInfo {

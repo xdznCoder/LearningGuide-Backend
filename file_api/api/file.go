@@ -30,11 +30,25 @@ func FileList(c *gin.Context) {
 
 	fileName := c.DefaultQuery("file_name", "")
 	fileType := c.DefaultQuery("file_type", "")
-	userId, err := strconv.Atoi(c.DefaultQuery("user_id", "0"))
-	courseId, err := strconv.Atoi(c.DefaultQuery("course_id", "0"))
-	pageNum, err := strconv.Atoi(c.DefaultQuery("pageNum", "0"))
-	pageSize, err := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
-
+	err, userId, courseId, pageNum, pageSize := func() (error, int, int, int, int) {
+		userId, err := strconv.Atoi(c.DefaultQuery("user_id", "0"))
+		if err != nil {
+			return err, 0, 0, 0, 0
+		}
+		courseId, err := strconv.Atoi(c.DefaultQuery("course_id", "0"))
+		if err != nil {
+			return err, 0, 0, 0, 0
+		}
+		pageNum, err := strconv.Atoi(c.DefaultQuery("pageNum", "0"))
+		if err != nil {
+			return err, 0, 0, 0, 0
+		}
+		pageSize, err := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+		if err != nil {
+			return err, 0, 0, 0, 0
+		}
+		return nil, userId, courseId, pageNum, pageSize
+	}()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"msg": "无效查询参数",
@@ -74,9 +88,16 @@ func UploadFile(c *gin.Context) {
 	}
 
 	userId, err := strconv.Atoi(c.DefaultPostForm("user_id", "0"))
+	if err != nil || userId <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg": "无效的ID参数",
+		})
+		return
+	}
+
 	courseId, err := strconv.Atoi(c.DefaultPostForm("course_id", "0"))
 
-	if err != nil || userId <= 0 || courseId <= 0 {
+	if err != nil || courseId <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"msg": "无效的ID参数",
 		})
@@ -103,7 +124,7 @@ func UploadFile(c *gin.Context) {
 	uuid := generateUniqueID(fileHeader.Filename, userId, courseId)
 
 	request := &oss.PutObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.BucketName),
+		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
 		Key:    oss.Ptr(uuid),
 		Body:   file,
 		Metadata: map[string]string{
@@ -272,7 +293,7 @@ func DownloadFile(c *gin.Context) {
 	expiration := time.Now().Add(1 * time.Hour)
 
 	req := &oss.GetObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.BucketName),
+		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
 		Key:    oss.Ptr(resp.OssUrl),
 		RequestCommon: oss.RequestCommon{
 			Parameters: map[string]string{
@@ -317,7 +338,7 @@ func UpdateFileDesc(c *gin.Context) {
 	client := getOssClient(global.ServerConfig.AliyunOss)
 
 	req := &oss.GetObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.BucketName),
+		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
 		Key:    oss.Ptr(resp.OssUrl),
 	}
 
@@ -399,7 +420,7 @@ func DeleteFile(c *gin.Context) {
 	client := getOssClient(global.ServerConfig.AliyunOss)
 
 	_, err = client.DeleteObject(ctx, &oss.DeleteObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.BucketName),
+		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
 		Key:    oss.Ptr(resp.OssUrl),
 	})
 

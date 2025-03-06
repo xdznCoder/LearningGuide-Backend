@@ -5,6 +5,7 @@ import (
 	"LearningGuide/class_api/gateway/policy"
 	"LearningGuide/class_api/global"
 	"LearningGuide/class_api/initialize"
+	"flag"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
@@ -13,9 +14,13 @@ import (
 	"syscall"
 )
 
+var configFile = flag.String("f", "class_api/config/config-debug.yaml", "the config file")
+
 func main() {
+	flag.Parse()
+
 	initialize.InitLogger()
-	initialize.InitConfig()
+	initialize.InitConfig(*configFile)
 	tracerCloser := initialize.InitTracer()
 	initialize.InitRedis()
 	initialize.InitSrvConnection(14, policy.RoundRobin)
@@ -25,7 +30,7 @@ func main() {
 	}
 	defer tracerCloser.Close()
 
-	registryId := fmt.Sprintf("%s", uuid.NewV4())
+	registryId := uuid.NewV4().String()
 
 	R := initialize.Routers()
 
@@ -35,7 +40,7 @@ func main() {
 		global.ServerConfig.Port,
 		global.ServerConfig.Name,
 		global.ServerConfig.Tags,
-		fmt.Sprintf("%s", registryId),
+		registryId,
 	)
 	if err != nil {
 		zap.S().Panicf("Connect to Register Center Failed: %v", err)

@@ -205,7 +205,7 @@ func getFileContext(ctx context.Context, fileIds []int32) (*ChatGLM_sdk.MessageC
 
 	for _, file := range files {
 		resp, err := client.GetObject(context.TODO(), &oss.GetObjectRequest{
-			Bucket: oss.Ptr(global.ServerConfig.AliyunOss.BucketName),
+			Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
 			Key:    oss.Ptr(file.OssUrl),
 		})
 

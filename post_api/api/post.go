@@ -4,6 +4,7 @@ import (
 	"LearningGuide/post_api/forms"
 	"LearningGuide/post_api/global"
 	PostProto "LearningGuide/post_api/proto/.PostProto"
+	"encoding/json"
 	"errors"
 	"github.com/OuterCyrex/Gorra/GorraAPI"
 	err_resp "github.com/OuterCyrex/Gorra/GorraAPI/resp"
@@ -19,10 +20,36 @@ func PostList(c *gin.Context) {
 
 	uid, _ := c.Get("userId")
 
-	userId, err := strconv.Atoi(c.DefaultQuery("user_id", "0"))
 	title := c.DefaultQuery("title", "")
 	category := c.DefaultQuery("category", "")
+	var categories []string
+
+	if category != "" {
+		err := json.Unmarshal([]byte(category), &categories)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"msg": "无效的分类查询参数",
+			})
+			return
+		}
+	}
+
+	userId, err := strconv.Atoi(c.DefaultQuery("user_id", "0"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg": "无效的查询参数",
+		})
+		return
+	}
+
 	pageNum, err := strconv.Atoi(c.DefaultQuery("pageNum", "0"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg": "无效的查询参数",
+		})
+		return
+	}
+
 	pageSize, err := strconv.Atoi(c.DefaultQuery("pageSize", "0"))
 
 	if err != nil {
@@ -35,7 +62,7 @@ func PostList(c *gin.Context) {
 	resp, err := global.PostSrvClient.PostList(ctx, &PostProto.PostFilterRequest{
 		UserId:   int32(userId),
 		Title:    title,
-		Category: category,
+		Category: categories,
 		PageNum:  int32(pageNum),
 		PageSize: int32(pageSize),
 	})

@@ -1,6 +1,7 @@
 syntax = "proto3";
-option go_package = ".UserProto";
+
 package user;
+option go_package="./userProto";
 
 message PageInfo {
   uint32 PageNum = 1;

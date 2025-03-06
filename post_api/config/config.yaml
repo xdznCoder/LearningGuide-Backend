@@ -1,5 +1,0 @@
-host: '8.137.23.119'
-port: 8848
-namespace: 'dbee383c-a328-4177-9475-864a1b429275'
-dataId: 'post_api'
-group: 'Debug'

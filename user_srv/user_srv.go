@@ -1,47 +1,60 @@
 package main
 
 import (
-	"LearningGuide/user_srv/gateway"
-	"LearningGuide/user_srv/global"
-	"LearningGuide/user_srv/handler"
-	"LearningGuide/user_srv/initialize"
-	proto "LearningGuide/user_srv/proto/.UserProto"
-	"LearningGuide/user_srv/utils"
+	"LearningGuide/user_srv/internal/config"
+	"LearningGuide/user_srv/internal/server"
+	"LearningGuide/user_srv/internal/svc"
+	"LearningGuide/user_srv/userProto"
+	"flag"
 	"fmt"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
+	"github.com/zeromicro/zero-contrib/zrpc/registry/consul"
 	"net"
+
+	"github.com/zeromicro/go-zero/core/conf"
+	"github.com/zeromicro/go-zero/core/service"
+	"github.com/zeromicro/go-zero/zrpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
+var configFile = flag.String("f", "user_srv/etc/user-debug.yaml", "the config file")
+
 func main() {
-	initialize.InitLogger()
-	initialize.InitConfig()
-	initialize.InitMysql()
+	flag.Parse()
+	var c config.Config
+	conf.MustLoad(*configFile, &c)
+	c.ListenOn = fmt.Sprintf("%s:%d", c.ListenOn, getFreePort())
 
-	port, err := utils.GetFreePort()
+	ctx := svc.NewServiceContext(c)
+
+	_ = consul.RegisterService(c.ListenOn, c.Consul)
+
+	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
+		userProto.RegisterUserServer(grpcServer, server.NewUserServer(ctx))
+
+		if c.Mode == service.DevMode || c.Mode == service.TestMode {
+			reflection.Register(grpcServer)
+		}
+	})
+	defer s.Stop()
+
+	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
+	s.Start()
+}
+
+func getFreePort() int {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
-		zap.S().Panicf("get free port error:%v", err)
+		return 0
 	}
 
-	server := grpc.NewServer()
-	proto.RegisterUserServer(server, &handler.UserServer{})
-
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", global.ServerConfig.Addr, port))
+	l, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		zap.S().Panicf("failed to listen: %v", err)
+		return 0
 	}
+	defer func() {
+		_ = l.Close()
+	}()
 
-	zap.S().Infof("Server Runs On Port %d", port)
-
-	grpc_health_v1.RegisterHealthServer(server, health.NewServer())
-
-	//健康检查
-	gateway.HealthCheck(fmt.Sprintf("%s:%d", global.ServerConfig.Addr, port), 15)
-
-	err = server.Serve(lis)
-	if err != nil {
-		zap.S().Panicf("failed to serve: %v", err)
-	}
+	return l.Addr().(*net.TCPAddr).Port
 }

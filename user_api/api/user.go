@@ -3,7 +3,7 @@ package api
 import (
 	"LearningGuide/user_api/forms"
 	"LearningGuide/user_api/global"
-	proto "LearningGuide/user_api/proto/.UserProto"
+	proto "LearningGuide/user_api/proto/userProto"
 	"LearningGuide/user_api/utils"
 	"LearningGuide/user_api/utils/JwtUtil"
 	"LearningGuide/user_api/validator"

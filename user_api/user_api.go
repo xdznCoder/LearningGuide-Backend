@@ -5,6 +5,7 @@ import (
 	"LearningGuide/user_api/gateway/policy"
 	"LearningGuide/user_api/global"
 	"LearningGuide/user_api/initialize"
+	"flag"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
@@ -13,9 +14,13 @@ import (
 	"syscall"
 )
 
+var configFile = flag.String("f", "user_api/config/config-debug.yaml", "the config file")
+
 func main() {
+	flag.Parse()
+
 	initialize.InitLogger()
-	initialize.InitConfig()
+	initialize.InitConfig(*configFile)
 	traceCloser := initialize.InitTracer()
 	initialize.InitRedis()
 	initialize.InitSrvConnection(14, policy.RoundRobin)
@@ -23,10 +28,10 @@ func main() {
 	if err != nil {
 		zap.S().Panicf("init trans failed: %v", zap.Error(err))
 	}
-	
+
 	defer traceCloser.Close()
 
-	registryId := fmt.Sprintf("%s", uuid.NewV4())
+	registryId := uuid.NewV4().String()
 
 	R := initialize.Routers()
 
