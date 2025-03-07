@@ -40,18 +40,21 @@ func (l *DeleteCommentLogic) DeleteComment(req *proto.DeleteCommentRequest) (*pr
 
 	tx := l.svcCtx.DB.Begin()
 
+	// 删除评论
 	result = tx.Model(&model.Comment{}).Delete(&model.Comment{BaseModel: model.BaseModel{ID: req.Id}})
 	if result.Error != nil {
 		tx.Rollback()
 		return nil, status.Errorf(codes.Internal, result.Error.Error())
 	}
 
+	// 删除所有的子评论
 	result = tx.Model(&model.Comment{}).Where(&model.Comment{ParentCommentId: req.Id}).Delete(&model.Comment{})
 	if result.Error != nil {
 		tx.Rollback()
 		return nil, status.Errorf(codes.Internal, result.Error.Error())
 	}
 
+	// 同步帖子的数据正确
 	subComment := int32(result.RowsAffected)
 
 	result = tx.Model(&model.Post{}).Where(&model.Post{BaseModel: model.BaseModel{ID: comment.PostId}}).Update("comment_num", post.CommentNum-1-subComment)

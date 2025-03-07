@@ -44,6 +44,8 @@ func (l *NewCommentLogic) NewComment(req *proto.NewCommentRequest) (*proto.NewCo
 		Content:         req.Content,
 	}
 
+	var parentOwnerId int32
+
 	if req.ParentCommentId != 0 {
 		var parent model.Comment
 
@@ -58,6 +60,7 @@ func (l *NewCommentLogic) NewComment(req *proto.NewCommentRequest) (*proto.NewCo
 			return nil, status.Errorf(codes.InvalidArgument, "与原评论不在同一帖子")
 		} else {
 			comment.ParentCommentId = req.ParentCommentId
+			parentOwnerId = parent.UserId
 		}
 	}
 
@@ -69,10 +72,37 @@ func (l *NewCommentLogic) NewComment(req *proto.NewCommentRequest) (*proto.NewCo
 		return nil, status.Errorf(codes.Internal, result.Error.Error())
 	}
 
-	result = tx.Model(&model.Post{}).Where(&model.Post{BaseModel: model.BaseModel{ID: req.PostId}}).Update("comment_num", post.CommentNum+1)
+	result = tx.Model(&model.Post{}).
+		Where(&model.Post{BaseModel: model.BaseModel{ID: req.PostId}}).
+		Update("comment_num", post.CommentNum+1)
 	if result.RowsAffected == 0 {
 		tx.Rollback()
-		return nil, status.Errorf(codes.NotFound, result.Error.Error())
+		return nil, status.Errorf(codes.Internal, result.Error.Error())
+	}
+
+	if err := tx.Create(&model.Notice{
+		UserId:  req.UserId,
+		PostId:  req.PostId,
+		OwnerId: post.UserId,
+		Type:    model.NoticeTypeCommentToPost,
+		IsRead:  false,
+	}).Error; err != nil {
+		tx.Rollback()
+		return nil, status.Errorf(codes.Internal, result.Error.Error())
+	}
+
+	if parentOwnerId != 0 {
+		if err := tx.Create(&model.Notice{
+			UserId:    req.UserId,
+			PostId:    req.PostId,
+			OwnerId:   parentOwnerId,
+			Type:      model.NoticeTypeCommentToComment,
+			CommentId: comment.ParentCommentId,
+			IsRead:    false,
+		}).Error; err != nil {
+			tx.Rollback()
+			return nil, status.Errorf(codes.Internal, result.Error.Error())
+		}
 	}
 
 	tx.Commit()

@@ -92,3 +92,18 @@ func (s *PostServer) DeleteComment(ctx context.Context, in *__PostProto.DeleteCo
 	l := logic.NewDeleteCommentLogic(ctx, s.svcCtx)
 	return l.DeleteComment(in)
 }
+
+func (s *PostServer) GetNoticeList(ctx context.Context, in *__PostProto.NoticeFilterRequest) (*__PostProto.NoticeListResponse, error) {
+	l := logic.NewGetNoticeListLogic(ctx, s.svcCtx)
+	return l.GetNoticeList(in)
+}
+
+func (s *PostServer) UpdateNoticeList(ctx context.Context, in *__PostProto.NoticeUpdateRequest) (*__PostProto.Empty, error) {
+	l := logic.NewUpdateNoticeListLogic(ctx, s.svcCtx)
+	return l.UpdateNoticeList(in)
+}
+
+func (s *PostServer) CheckNotice(ctx context.Context, in *__PostProto.CheckNoticeRequest) (*__PostProto.CheckNoticeResponse, error) {
+	l := logic.NewCheckNoticeLogic(ctx, s.svcCtx)
+	return l.CheckNotice(in)
+}

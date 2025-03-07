@@ -20,6 +20,42 @@ service post{
   rpc NewComment (NewCommentRequest) returns (NewCommentResponse);
   rpc CommentList (CommentFilterRequest) returns (CommentListResponse);
   rpc DeleteComment (DeleteCommentRequest) returns (Empty);
+
+  rpc GetNoticeList (NoticeFilterRequest) returns (NoticeListResponse);
+  rpc UpdateNoticeList (NoticeUpdateRequest) returns (Empty);
+  rpc CheckNotice (CheckNoticeRequest) returns (CheckNoticeResponse);
+}
+
+message CheckNoticeResponse {
+  bool NewNotices = 1;
+}
+
+message CheckNoticeRequest {
+  int32 UserId = 1;
+}
+
+message NoticeFilterRequest {
+  int32 UserId = 1;
+  int32 Type = 2;
+  int32 PageSize = 3;
+  int32 PageNum = 4;
+}
+
+message NoticeInfoResponse {
+  int32 Id = 1;
+  int32 UserId = 2;
+  int32 OwnerId = 3;
+  int32 Type = 4;
+  bool IsRead = 5;
+}
+
+message NoticeListResponse {
+  int64 total = 1;
+  repeated NoticeInfoResponse data = 2;
+}
+
+message NoticeUpdateRequest {
+  int32 Id = 1;
 }
 
 message DeleteCommentRequest {
