@@ -27,6 +27,7 @@ func NewCheckNoticeLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Check
 
 func (l *CheckNoticeLogic) CheckNotice(in *proto.CheckNoticeRequest) (*proto.CheckNoticeResponse, error) {
 	result := l.svcCtx.DB.Model(&model.Notice{}).Where(&model.Notice{OwnerId: in.UserId}).
+		Where("owner_id != user_id").
 		Where("is_read = ?", 0).
 		Limit(1).Find(&model.Notice{})
 

@@ -22,7 +22,6 @@ service post{
   rpc DeleteComment (DeleteCommentRequest) returns (Empty);
 
   rpc GetNoticeList (NoticeFilterRequest) returns (NoticeListResponse);
-  rpc UpdateNoticeList (NoticeUpdateRequest) returns (Empty);
   rpc CheckNotice (CheckNoticeRequest) returns (CheckNoticeResponse);
 }
 
@@ -46,16 +45,12 @@ message NoticeInfoResponse {
   int32 UserId = 2;
   int32 OwnerId = 3;
   int32 Type = 4;
-  bool IsRead = 5;
+  int32 PostId = 5;
 }
 
 message NoticeListResponse {
   int64 total = 1;
   repeated NoticeInfoResponse data = 2;
-}
-
-message NoticeUpdateRequest {
-  int32 Id = 1;
 }
 
 message DeleteCommentRequest {

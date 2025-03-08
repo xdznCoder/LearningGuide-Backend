@@ -19,23 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Post_NewPost_FullMethodName          = "/post.post/NewPost"
-	Post_GetPost_FullMethodName          = "/post.post/GetPost"
-	Post_PostList_FullMethodName         = "/post.post/PostList"
-	Post_UpdatePost_FullMethodName       = "/post.post/UpdatePost"
-	Post_DeletePost_FullMethodName       = "/post.post/DeletePost"
-	Post_NewLike_FullMethodName          = "/post.post/NewLike"
-	Post_PostListByLike_FullMethodName   = "/post.post/PostListByLike"
-	Post_DeleteLike_FullMethodName       = "/post.post/DeleteLike"
-	Post_NewFav_FullMethodName           = "/post.post/NewFav"
-	Post_PostListByFav_FullMethodName    = "/post.post/PostListByFav"
-	Post_DeleteFav_FullMethodName        = "/post.post/DeleteFav"
-	Post_NewComment_FullMethodName       = "/post.post/NewComment"
-	Post_CommentList_FullMethodName      = "/post.post/CommentList"
-	Post_DeleteComment_FullMethodName    = "/post.post/DeleteComment"
-	Post_GetNoticeList_FullMethodName    = "/post.post/GetNoticeList"
-	Post_UpdateNoticeList_FullMethodName = "/post.post/UpdateNoticeList"
-	Post_CheckNotice_FullMethodName      = "/post.post/CheckNotice"
+	Post_NewPost_FullMethodName        = "/post.post/NewPost"
+	Post_GetPost_FullMethodName        = "/post.post/GetPost"
+	Post_PostList_FullMethodName       = "/post.post/PostList"
+	Post_UpdatePost_FullMethodName     = "/post.post/UpdatePost"
+	Post_DeletePost_FullMethodName     = "/post.post/DeletePost"
+	Post_NewLike_FullMethodName        = "/post.post/NewLike"
+	Post_PostListByLike_FullMethodName = "/post.post/PostListByLike"
+	Post_DeleteLike_FullMethodName     = "/post.post/DeleteLike"
+	Post_NewFav_FullMethodName         = "/post.post/NewFav"
+	Post_PostListByFav_FullMethodName  = "/post.post/PostListByFav"
+	Post_DeleteFav_FullMethodName      = "/post.post/DeleteFav"
+	Post_NewComment_FullMethodName     = "/post.post/NewComment"
+	Post_CommentList_FullMethodName    = "/post.post/CommentList"
+	Post_DeleteComment_FullMethodName  = "/post.post/DeleteComment"
+	Post_GetNoticeList_FullMethodName  = "/post.post/GetNoticeList"
+	Post_CheckNotice_FullMethodName    = "/post.post/CheckNotice"
 )
 
 // PostClient is the client API for Post service.
@@ -57,7 +56,6 @@ type PostClient interface {
 	CommentList(ctx context.Context, in *CommentFilterRequest, opts ...grpc.CallOption) (*CommentListResponse, error)
 	DeleteComment(ctx context.Context, in *DeleteCommentRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetNoticeList(ctx context.Context, in *NoticeFilterRequest, opts ...grpc.CallOption) (*NoticeListResponse, error)
-	UpdateNoticeList(ctx context.Context, in *NoticeUpdateRequest, opts ...grpc.CallOption) (*Empty, error)
 	CheckNotice(ctx context.Context, in *CheckNoticeRequest, opts ...grpc.CallOption) (*CheckNoticeResponse, error)
 }
 
@@ -219,16 +217,6 @@ func (c *postClient) GetNoticeList(ctx context.Context, in *NoticeFilterRequest,
 	return out, nil
 }
 
-func (c *postClient) UpdateNoticeList(ctx context.Context, in *NoticeUpdateRequest, opts ...grpc.CallOption) (*Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
-	err := c.cc.Invoke(ctx, Post_UpdateNoticeList_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *postClient) CheckNotice(ctx context.Context, in *CheckNoticeRequest, opts ...grpc.CallOption) (*CheckNoticeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CheckNoticeResponse)
@@ -258,7 +246,6 @@ type PostServer interface {
 	CommentList(context.Context, *CommentFilterRequest) (*CommentListResponse, error)
 	DeleteComment(context.Context, *DeleteCommentRequest) (*Empty, error)
 	GetNoticeList(context.Context, *NoticeFilterRequest) (*NoticeListResponse, error)
-	UpdateNoticeList(context.Context, *NoticeUpdateRequest) (*Empty, error)
 	CheckNotice(context.Context, *CheckNoticeRequest) (*CheckNoticeResponse, error)
 	mustEmbedUnimplementedPostServer()
 }
@@ -314,9 +301,6 @@ func (UnimplementedPostServer) DeleteComment(context.Context, *DeleteCommentRequ
 }
 func (UnimplementedPostServer) GetNoticeList(context.Context, *NoticeFilterRequest) (*NoticeListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNoticeList not implemented")
-}
-func (UnimplementedPostServer) UpdateNoticeList(context.Context, *NoticeUpdateRequest) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateNoticeList not implemented")
 }
 func (UnimplementedPostServer) CheckNotice(context.Context, *CheckNoticeRequest) (*CheckNoticeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckNotice not implemented")
@@ -612,24 +596,6 @@ func _Post_GetNoticeList_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Post_UpdateNoticeList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NoticeUpdateRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PostServer).UpdateNoticeList(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Post_UpdateNoticeList_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PostServer).UpdateNoticeList(ctx, req.(*NoticeUpdateRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Post_CheckNotice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CheckNoticeRequest)
 	if err := dec(in); err != nil {
@@ -714,10 +680,6 @@ var Post_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetNoticeList",
 			Handler:    _Post_GetNoticeList_Handler,
-		},
-		{
-			MethodName: "UpdateNoticeList",
-			Handler:    _Post_UpdateNoticeList_Handler,
 		},
 		{
 			MethodName: "CheckNotice",
