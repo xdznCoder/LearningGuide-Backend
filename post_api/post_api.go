@@ -4,6 +4,7 @@ import (
 	"LearningGuide/post_api/global"
 	"LearningGuide/post_api/initialize"
 	PostProto "LearningGuide/post_api/proto/.PostProto"
+	UserProto "LearningGuide/post_api/proto/userProto"
 	"LearningGuide/post_api/router"
 	"flag"
 	"github.com/OuterCyrex/Gorra/GorraAPI"
@@ -11,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var configFile = flag.String("f", "file_api/config/config-debug.yaml", "the config file")
+var configFile = flag.String("f", "post_api/config/config-debug.yaml", "the config file")
 
 func main() {
 	flag.Parse()
@@ -31,6 +32,7 @@ func main() {
 
 	// 初始化rpc连接
 	postConn, err := GorraAPI.GetSrvConnection(14, global.ServerConfig, global.ServerConfig.SrvList[0])
+	userConn, err := GorraAPI.GetSrvConnection(14, global.ServerConfig, global.ServerConfig.SrvList[1])
 	if err != nil {
 		zap.S().Panicf("get connection error: %s", err.Error())
 	}
@@ -39,6 +41,7 @@ func main() {
 	initialize.InitRedis()
 
 	global.PostSrvClient = PostProto.NewPostClient(postConn)
+	global.UserSrvClient = UserProto.NewUserClient(userConn)
 
 	// 初始化路由
 	r := GorraAPI.KeepAliveRouters("v1",
@@ -46,6 +49,7 @@ func main() {
 		router.LikeRouter,
 		router.FavRouter,
 		router.CommentRouter,
+		router.NoticeRouter,
 	)
 
 	// 启动路由服务

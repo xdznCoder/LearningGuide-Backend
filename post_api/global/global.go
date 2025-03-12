@@ -3,6 +3,7 @@ package global
 import (
 	"LearningGuide/post_api/config"
 	PostProto "LearningGuide/post_api/proto/.PostProto"
+	UserProto "LearningGuide/post_api/proto/userProto"
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -12,6 +13,7 @@ var (
 	ServerConfig  config.MainConfig
 	RDB           redis.Client
 	PostSrvClient PostProto.PostClient
+	UserSrvClient UserProto.UserClient
 )
 
 func InitConfig(path string) {

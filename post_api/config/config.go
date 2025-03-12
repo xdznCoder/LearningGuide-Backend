@@ -3,27 +3,27 @@ package config
 import "github.com/OuterCyrex/Gorra/GorraAPI"
 
 type MainConfig struct {
-	Name    string                `json:"name"`
-	Address string                `json:"address"`
-	Port    int                   `json:"port"`
-	Tags    []string              `json:"tags"`
-	SrvList []string              `json:"srvList"`
-	JwtKey  string                `json:"jwtKey"`
-	Jaeger  JaegerConfig          `json:"jaeger"`
-	Redis   RedisConfig           `json:"redis"`
-	Consul  GorraAPI.ConsulConfig `json:"consul"`
+	Name    string                `mapstructure:"name"`
+	Address string                `mapstructure:"address"`
+	Port    int                   `mapstructure:"port"`
+	Tags    []string              `mapstructure:"tags"`
+	SrvList []string              `mapstructure:"srvList"`
+	JwtKey  string                `mapstructure:"jwtKey"`
+	Jaeger  JaegerConfig          `mapstructure:"jaeger"`
+	Redis   RedisConfig           `mapstructure:"redis"`
+	Consul  GorraAPI.ConsulConfig `mapstructure:"consul"`
 }
 
 type JaegerConfig struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
 }
 
 type RedisConfig struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Password string `json:"password"`
-	DB       int    `json:"db"`
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
 }
 
 func (c MainConfig) GetRegistryInfo() GorraAPI.RegistryInfo {
