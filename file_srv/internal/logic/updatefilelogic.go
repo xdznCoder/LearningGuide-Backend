@@ -28,7 +28,8 @@ func NewUpdateFileLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Update
 
 func (l *UpdateFileLogic) UpdateFile(req *proto.UpdateFileRequest) (*proto.Empty, error) {
 	file := model.File{
-		Desc: req.Desc,
+		Desc:    req.Desc,
+		MindMap: req.MindMap,
 	}
 
 	result := l.svcCtx.DB.Model(&model.File{}).Where(model.File{BaseModel: model.BaseModel{ID: req.Id}}).Updates(&file)

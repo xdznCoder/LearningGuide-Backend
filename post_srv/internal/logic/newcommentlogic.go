@@ -81,11 +81,12 @@ func (l *NewCommentLogic) NewComment(req *proto.NewCommentRequest) (*proto.NewCo
 	}
 
 	if err := tx.Create(&model.Notice{
-		UserId:  req.UserId,
-		PostId:  req.PostId,
-		OwnerId: post.UserId,
-		Type:    model.NoticeTypeCommentToPost,
-		IsRead:  false,
+		UserId:    req.UserId,
+		PostId:    req.PostId,
+		OwnerId:   post.UserId,
+		Type:      model.NoticeTypeCommentToPost,
+		PostTitle: post.Title,
+		IsRead:    false,
 	}).Error; err != nil {
 		tx.Rollback()
 		return nil, status.Errorf(codes.Internal, result.Error.Error())
@@ -97,6 +98,7 @@ func (l *NewCommentLogic) NewComment(req *proto.NewCommentRequest) (*proto.NewCo
 			PostId:    req.PostId,
 			OwnerId:   parentOwnerId,
 			Type:      model.NoticeTypeCommentToComment,
+			PostTitle: post.Title,
 			CommentId: comment.ParentCommentId,
 			IsRead:    false,
 		}).Error; err != nil {

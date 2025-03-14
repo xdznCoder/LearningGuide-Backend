@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"time"
 )
@@ -30,25 +31,13 @@ func FileList(c *gin.Context) {
 
 	fileName := c.DefaultQuery("file_name", "")
 	fileType := c.DefaultQuery("file_type", "")
-	err, userId, courseId, pageNum, pageSize := func() (error, int, int, int, int) {
-		userId, err := strconv.Atoi(c.DefaultQuery("user_id", "0"))
-		if err != nil {
-			return err, 0, 0, 0, 0
-		}
-		courseId, err := strconv.Atoi(c.DefaultQuery("course_id", "0"))
-		if err != nil {
-			return err, 0, 0, 0, 0
-		}
-		pageNum, err := strconv.Atoi(c.DefaultQuery("pageNum", "0"))
-		if err != nil {
-			return err, 0, 0, 0, 0
-		}
-		pageSize, err := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
-		if err != nil {
-			return err, 0, 0, 0, 0
-		}
-		return nil, userId, courseId, pageNum, pageSize
-	}()
+	userId, err1 := strconv.Atoi(c.DefaultQuery("user_id", "0"))
+	courseId, err2 := strconv.Atoi(c.DefaultQuery("course_id", "0"))
+	pageNum, err3 := strconv.Atoi(c.DefaultQuery("pageNum", "0"))
+	pageSize, err4 := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+
+	err := errors.Join(err1, err2, err3, err4)
+
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"msg": "无效查询参数",
@@ -437,6 +426,124 @@ func DeleteFile(c *gin.Context) {
 	})
 }
 
+func UpdateFileMindMap(c *gin.Context) {
+	ctx := GorraAPI.RawContextWithSpan(c)
+
+	fileId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg": "无效的路径参数",
+		})
+		return
+	}
+
+	resp, err := getFileInfo(ctx, fileId)
+
+	if err != nil {
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
+		return
+	}
+
+	client := getOssClient(global.ServerConfig.AliyunOss)
+
+	req := &oss.GetObjectRequest{
+		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
+		Key:    oss.Ptr(resp.OssUrl),
+	}
+
+	result, err := client.GetObject(context.TODO(), req)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "服务器内部错误",
+		})
+		zap.S().Errorf("get object from oss failed: %v", err)
+		return
+	}
+
+	file, err := utils.ReadFile(result.Body, resp.FileName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "服务器内部错误",
+		})
+		zap.S().Errorf("read from file failed: %v", err)
+		return
+	}
+
+	glm := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
+
+	glmId, err := glm.SendAsync(ChatGLM_sdk.NewContext(), file+getMindMapPrompt())
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "解析文件失败",
+		})
+		return
+	}
+
+	_, err = global.FileSrvClient.UpdateFile(ctx, &FileProto.UpdateFileRequest{
+		Id:      int32(fileId),
+		MindMap: glmId,
+	})
+
+	if err != nil {
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
+		return
+	}
+
+	global.RDB.Del(context.Background(), fmt.Sprintf("%d", fileId))
+
+	c.JSON(http.StatusOK, gin.H{
+		"glm_id": glmId,
+	})
+}
+
+func GetMindMap(c *gin.Context) {
+
+	ctx := GorraAPI.RawContextWithSpan(c)
+
+	fileId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg": "无效的路径参数",
+		})
+		return
+	}
+
+	resp, err := getFileInfo(ctx, fileId)
+	if err != nil {
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
+		return
+	}
+
+	if resp.MindMap == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg": "尚未生成思维导图",
+		})
+		return
+	}
+
+	glm := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
+	Result := glm.GetAsyncMessage(ChatGLM_sdk.NewContext(), resp.MindMap)
+
+	if errors.Is(Result.Error, ChatGLM_sdk.ErrResultProcessing) {
+		c.JSON(http.StatusAccepted, gin.H{
+			"msg": "GLM正在生成中",
+		})
+		return
+	} else if Result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "服务器内部错误",
+		})
+		zap.S().Errorf("get result from glm failed: %v", Result.Error)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"mind_map": transResultToStringJSON(Result),
+	})
+}
+
 func getOssClient(config config.OssConfig) *oss.Client {
 	cfg := oss.LoadDefaultConfig().WithCredentialsProvider(
 		credentials.NewStaticCredentialsProvider(config.AccessKey, config.SecretKey, "")).
@@ -483,6 +590,28 @@ func getPrompt() string {
 	return `请简要分析一下上述内容，回答的字数限制在500字左右`
 }
 
+func getMindMapPrompt() string {
+	return `请在分析上述内容后，返回jsmind可以渲染的json内容，不要超过字数限制，只返回jsmind可渲染的json代码块即可，一定要jsmind可渲染`
+}
+
 func generateUniqueID(fileName string, userId int, courseId int) string {
 	return fmt.Sprintf("%d-%d-%s", userId, courseId, fileName)
+}
+
+func transResultToStringJSON(result ChatGLM_sdk.Result) string {
+	pattern := "```json\\s*({[\\s\\S]*?})\\s*```"
+
+	re := regexp.MustCompile(pattern)
+
+	matches := re.FindStringSubmatch(result.Message[0].Content)
+
+	var output string
+
+	if matches == nil {
+		output = result.Message[0].Content
+	} else {
+		output = matches[1]
+	}
+
+	return output
 }

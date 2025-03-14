@@ -226,6 +226,7 @@ message Empty {}
 message UpdateFileRequest {
   int32 Id = 1;
   string Desc = 2;
+  string MindMap = 3;
 }
 
 message DeleteFileRequest {
@@ -259,6 +260,7 @@ message FileInfoResponse {
   string Desc = 6;
   int32 UserId = 7;
   int32 CourseId = 8;
+  string MindMap = 9;
 }
 
 message FileFilterRequest {

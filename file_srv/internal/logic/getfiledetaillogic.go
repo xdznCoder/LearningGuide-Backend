@@ -46,5 +46,6 @@ func (l *GetFileDetailLogic) GetFileDetail(req *proto.FileDetailRequest) (*proto
 		Desc:     file.Desc,
 		UserId:   file.UserId,
 		CourseId: file.CourseId,
+		MindMap:  file.MindMap,
 	}, nil
 }

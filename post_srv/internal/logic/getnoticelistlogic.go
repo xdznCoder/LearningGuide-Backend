@@ -30,11 +30,13 @@ func (l *GetNoticeListLogic) GetNoticeList(in *proto.NoticeFilterRequest) (*prot
 	var count int64
 	var notices []model.Notice
 
-	filter := l.svcCtx.DB.Model(&model.Notice{}).Where("owner_id = ? AND owner_id != user_id", in.UserId)
+	filter := l.svcCtx.DB.Model(&model.Notice{}).Order("add_time DESC").Where("owner_id = ? AND owner_id != user_id", in.UserId)
 
 	if in.Type != 0 {
 		filter = filter.Where("type = ?", in.Type)
 	}
+
+	notAllRead := false
 
 	filter.Count(&count)
 	result := filter.Scopes(model.Paginate(int(in.PageNum), int(in.PageSize))).Find(&notices)
@@ -49,18 +51,24 @@ func (l *GetNoticeListLogic) GetNoticeList(in *proto.NoticeFilterRequest) (*prot
 	for _, n := range notices {
 		ids = append(ids, n.ID)
 		respList = append(respList, &proto.NoticeInfoResponse{
-			Id:      n.ID,
-			UserId:  n.UserId,
-			OwnerId: n.OwnerId,
-			Type:    n.Type,
-			PostId:  n.PostId,
+			Id:        n.ID,
+			UserId:    n.UserId,
+			OwnerId:   n.OwnerId,
+			Type:      n.Type,
+			PostId:    n.PostId,
+			PostTitle: n.PostTitle,
 		})
+		if !n.IsRead {
+			notAllRead = true
+		}
 	}
 
-	err := l.svcCtx.DB.Model(&model.Notice{}).Where("Id in (?)", ids).Update("is_read", true).Error
+	if notAllRead {
+		err := l.svcCtx.DB.Model(&model.Notice{}).Where("Id in (?)", ids).Update("is_read", true).Error
 
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, err.Error())
+		}
 	}
 
 	return &proto.NoticeListResponse{

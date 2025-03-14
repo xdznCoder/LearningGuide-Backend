@@ -4,3 +4,4 @@ dump.rdb
 .idea
 *.yaml
 build
+scripts

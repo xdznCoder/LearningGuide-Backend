@@ -6,18 +6,18 @@ import (
 	FileProto "LearningGuide/file_api/proto/.FileProto"
 	"LearningGuide/file_api/utils"
 	"context"
-	"errors"
+	"fmt"
 	"github.com/OuterCyrex/ChatGLM_sdk"
 	"github.com/OuterCyrex/Gorra/GorraAPI"
 	handleGrpc "github.com/OuterCyrex/Gorra/GorraAPI/resp"
 	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 func SessionList(c *gin.Context) {
@@ -59,6 +59,8 @@ func NewSession(c *gin.Context) {
 		return
 	}
 
+	sessionManager.New(resp.Id)
+
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -74,9 +76,7 @@ func DeleteSession(c *gin.Context) {
 		return
 	}
 
-	SessionMapMu.Lock()
-	delete(SessionMap, int32(Id))
-	SessionMapMu.Unlock()
+	sessionManager.Del(int32(Id))
 
 	_, err = global.FileSrvClient.DeleteSession(ctx, &FileProto.DeleteSessionRequest{Id: int32(Id)})
 	if err != nil {
@@ -117,55 +117,34 @@ func MessageList(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// websocket upgrader
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+type SessionManager struct {
+	lock    sync.Mutex
+	session map[int32]*ChatGLM_sdk.MessageContext
 }
 
-type session struct {
-	history  *ChatGLM_sdk.MessageContext
-	wsClient *websocket.Conn
+func NewSessionManager() *SessionManager {
+	return &SessionManager{
+		lock:    sync.Mutex{},
+		session: make(map[int32]*ChatGLM_sdk.MessageContext),
+	}
 }
 
-var SessionMapMu sync.Mutex
+func (s *SessionManager) New(Id int32) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.session[Id] = ChatGLM_sdk.NewContext()
+}
 
-var SessionMap = make(map[int32]session)
+func (s *SessionManager) Del(Id int32) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	delete(s.session, Id)
+}
 
-func SetUpWebsocket(c *gin.Context) {
-	sessionId, err := strconv.Atoi(c.DefaultQuery("session_id", "0"))
+var sessionManager *SessionManager
 
-	if err != nil || sessionId <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "无效的会话ID",
-		})
-		return
-	}
-
-	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		zap.S().Errorf("upgrade to WebSocket failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "建立连接失败",
-		})
-		return
-	}
-
-	SessionMapMu.Lock()
-	SessionMap[int32(sessionId)] = session{
-		wsClient: ws,
-		history:  ChatGLM_sdk.NewContext(),
-	}
-	SessionMapMu.Unlock()
-
-	for {
-		_, _, err := ws.ReadMessage()
-		if err != nil {
-			zap.S().Infof("WebSocket connection closed for session %d", sessionId)
-			return
-		}
-	}
+func init() {
+	sessionManager = NewSessionManager()
 }
 
 func SendMessage(c *gin.Context) {
@@ -180,26 +159,25 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
-	if _, ok := SessionMap[message.SessionId]; !ok {
+	// 参数校验
+	if _, ok := sessionManager.session[message.SessionId]; !ok {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"msg": "会话次数已达上限，请开始新的会话",
 		})
 		return
 	}
 
-	if len(*SessionMap[message.SessionId].history) > 30 {
+	if len(*sessionManager.session[message.SessionId]) > 30 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"msg": "会话次数已达上限，请开始新的会话",
 		})
 
-		SessionMapMu.Lock()
-		delete(SessionMap, message.SessionId)
-		SessionMapMu.Unlock()
+		sessionManager.Del(message.SessionId)
 
 		return
 	}
 
-	ws := SessionMap[message.SessionId].wsClient
+	// 模式选择
 
 	client := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
 
@@ -209,7 +187,7 @@ func SendMessage(c *gin.Context) {
 
 	switch message.Type {
 	case 1:
-		msgChannel = client.SendStream(SessionMap[message.SessionId].history, message.Content)
+		msgChannel = client.SendStream(sessionManager.session[message.SessionId], message.Content)
 	case 2:
 		fileId, err := strconv.Atoi(message.Content)
 		if err != nil {
@@ -250,25 +228,21 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 
-		msgChannel = client.SendStream(SessionMap[message.SessionId].history, file)
+		msgChannel = client.SendStream(sessionManager.session[message.SessionId], file)
 	}
 
 	for words := range msgChannel {
 		if len(words.Message) > 0 {
-			resp.WriteString(words.Message[0].Content)
-			err = ws.WriteMessage(websocket.TextMessage, []byte(words.Message[0].Content))
-			if errors.Is(err, websocket.ErrCloseSent) {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"msg": "先建立websocket连接",
-				})
-				return
-			} else if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"msg": "服务器内部错误",
-				})
-				zap.S().Errorf("write message to file failed: %v", err)
-				return
+
+			content := words.Message[0].Content
+
+			resp.WriteString(content)
+
+			_, _ = fmt.Fprintf(c.Writer, "data: %s\n", content)
+			if flusher, ok := c.Writer.(http.Flusher); ok {
+				flusher.Flush()
 			}
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 
@@ -293,8 +267,4 @@ func SendMessage(c *gin.Context) {
 		handleGrpc.HandleGrpcErrorToHttp(err, c)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"msg": "发送成功",
-	})
 }

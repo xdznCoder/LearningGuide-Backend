@@ -62,11 +62,12 @@ func (l *NewLikeLogic) NewLike(req *proto.NewLikeRequest) (*proto.Empty, error) 
 
 	// 创建数据库通知信息
 	if result := tx.Create(&model.Notice{
-		UserId:  req.UserId,
-		PostId:  req.PostId,
-		OwnerId: post.UserId,
-		Type:    model.NoticeTypeLikeToPost,
-		IsRead:  false,
+		UserId:    req.UserId,
+		PostId:    req.PostId,
+		OwnerId:   post.UserId,
+		PostTitle: post.Title,
+		Type:      model.NoticeTypeLikeToPost,
+		IsRead:    false,
 	}); result.Error != nil {
 		tx.Rollback()
 		return nil, status.Errorf(codes.Internal, result.Error.Error())

@@ -38,6 +38,11 @@ func (s *UserServer) GetUserById(ctx context.Context, in *userProto.IdRequest) (
 	return l.GetUserById(in)
 }
 
+func (s *UserServer) GetUsersByIds(ctx context.Context, in *userProto.IdsRequest) (*userProto.UserListResponse, error) {
+	l := logic.NewGetUsersByIdsLogic(ctx, s.svcCtx)
+	return l.GetUsersByIds(in)
+}
+
 func (s *UserServer) CreateUser(ctx context.Context, in *userProto.CreateUserInfo) (*userProto.UserInfoResponse, error) {
 	l := logic.NewCreateUserLogic(ctx, s.svcCtx)
 	return l.CreateUser(in)

@@ -10,6 +10,7 @@ type File struct {
 	Desc     string `gorm:"type:text"`
 	UserId   int32  `gorm:"not null"`
 	CourseId int32  `gorm:"not null"`
+	MindMap  string `gorm:"type:text"`
 }
 
 func (File) TableName() string {

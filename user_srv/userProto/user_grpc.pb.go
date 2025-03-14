@@ -22,6 +22,7 @@ const (
 	User_GetUserList_FullMethodName       = "/user.User/GetUserList"
 	User_GetUserByEmail_FullMethodName    = "/user.User/GetUserByEmail"
 	User_GetUserById_FullMethodName       = "/user.User/GetUserById"
+	User_GetUsersByIds_FullMethodName     = "/user.User/GetUsersByIds"
 	User_CreateUser_FullMethodName        = "/user.User/CreateUser"
 	User_UpdateUser_FullMethodName        = "/user.User/UpdateUser"
 	User_CheckPasswordInfo_FullMethodName = "/user.User/CheckPasswordInfo"
@@ -36,6 +37,7 @@ type UserClient interface {
 	GetUserList(ctx context.Context, in *PageInfo, opts ...grpc.CallOption) (*UserListResponse, error)
 	GetUserByEmail(ctx context.Context, in *EmailRequest, opts ...grpc.CallOption) (*UserInfoResponse, error)
 	GetUserById(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*UserInfoResponse, error)
+	GetUsersByIds(ctx context.Context, in *IdsRequest, opts ...grpc.CallOption) (*UserListResponse, error)
 	CreateUser(ctx context.Context, in *CreateUserInfo, opts ...grpc.CallOption) (*UserInfoResponse, error)
 	UpdateUser(ctx context.Context, in *UpdateUserInfo, opts ...grpc.CallOption) (*Empty, error)
 	CheckPasswordInfo(ctx context.Context, in *PasswordCheck, opts ...grpc.CallOption) (*CheckResponse, error)
@@ -75,6 +77,16 @@ func (c *userClient) GetUserById(ctx context.Context, in *IdRequest, opts ...grp
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UserInfoResponse)
 	err := c.cc.Invoke(ctx, User_GetUserById_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userClient) GetUsersByIds(ctx context.Context, in *IdsRequest, opts ...grpc.CallOption) (*UserListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserListResponse)
+	err := c.cc.Invoke(ctx, User_GetUsersByIds_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +150,7 @@ type UserServer interface {
 	GetUserList(context.Context, *PageInfo) (*UserListResponse, error)
 	GetUserByEmail(context.Context, *EmailRequest) (*UserInfoResponse, error)
 	GetUserById(context.Context, *IdRequest) (*UserInfoResponse, error)
+	GetUsersByIds(context.Context, *IdsRequest) (*UserListResponse, error)
 	CreateUser(context.Context, *CreateUserInfo) (*UserInfoResponse, error)
 	UpdateUser(context.Context, *UpdateUserInfo) (*Empty, error)
 	CheckPasswordInfo(context.Context, *PasswordCheck) (*CheckResponse, error)
@@ -161,6 +174,9 @@ func (UnimplementedUserServer) GetUserByEmail(context.Context, *EmailRequest) (*
 }
 func (UnimplementedUserServer) GetUserById(context.Context, *IdRequest) (*UserInfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserById not implemented")
+}
+func (UnimplementedUserServer) GetUsersByIds(context.Context, *IdsRequest) (*UserListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUsersByIds not implemented")
 }
 func (UnimplementedUserServer) CreateUser(context.Context, *CreateUserInfo) (*UserInfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateUser not implemented")
@@ -248,6 +264,24 @@ func _User_GetUserById_Handler(srv interface{}, ctx context.Context, dec func(in
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServer).GetUserById(ctx, req.(*IdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _User_GetUsersByIds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IdsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServer).GetUsersByIds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: User_GetUsersByIds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServer).GetUsersByIds(ctx, req.(*IdsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -360,6 +394,10 @@ var User_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUserById",
 			Handler:    _User_GetUserById_Handler,
+		},
+		{
+			MethodName: "GetUsersByIds",
+			Handler:    _User_GetUsersByIds_Handler,
 		},
 		{
 			MethodName: "CreateUser",

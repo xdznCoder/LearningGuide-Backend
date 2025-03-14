@@ -24,6 +24,7 @@ service User {
   rpc GetUserList(PageInfo) returns (UserListResponse);
   rpc GetUserByEmail(EmailRequest) returns (UserInfoResponse);
   rpc GetUserById(IdRequest) returns (UserInfoResponse);
+  rpc GetUsersByIds(IdsRequest) returns (UserListResponse);
   rpc CreateUser(CreateUserInfo) returns (UserInfoResponse);
   rpc UpdateUser(UpdateUserInfo) returns (Empty);
   rpc CheckPasswordInfo (PasswordCheck) returns (CheckResponse);
@@ -32,6 +33,10 @@ service User {
 }
 
 message Empty{}
+
+message IdsRequest {
+  repeated int32 Ids = 1;
+}
 
 message ChangePasswordRequest {
   int32 Id = 1;

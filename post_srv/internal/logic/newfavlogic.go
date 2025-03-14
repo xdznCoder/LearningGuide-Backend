@@ -62,11 +62,12 @@ func (l *NewFavLogic) NewFav(req *proto.NewFavRequest) (*proto.Empty, error) {
 
 	// 创建数据库通知信息
 	if result := tx.Create(&model.Notice{
-		UserId:  req.UserId,
-		PostId:  req.PostId,
-		OwnerId: post.UserId,
-		Type:    model.NoticeTypeFavToPost,
-		IsRead:  false,
+		UserId:    req.UserId,
+		PostId:    req.PostId,
+		OwnerId:   post.UserId,
+		Type:      model.NoticeTypeFavToPost,
+		IsRead:    false,
+		PostTitle: post.Title,
 	}); result.Error != nil {
 		tx.Rollback()
 		return nil, status.Errorf(codes.Internal, result.Error.Error())

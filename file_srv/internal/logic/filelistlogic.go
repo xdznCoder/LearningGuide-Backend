@@ -66,6 +66,7 @@ func (l *FileListLogic) FileList(req *proto.FileFilterRequest) (*proto.FileListR
 			Desc:     v.Desc,
 			UserId:   v.UserId,
 			CourseId: v.CourseId,
+			MindMap:  v.MindMap,
 		})
 	}
 

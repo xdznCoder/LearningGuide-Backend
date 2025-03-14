@@ -19,6 +19,5 @@ func MessageRouter(R *gin.RouterGroup) {
 	{
 		Message.GET("/list", api.MessageList)
 		Message.POST("/send", api.SendMessage)
-		Message.GET("/new", api.SetUpWebsocket)
 	}
 }

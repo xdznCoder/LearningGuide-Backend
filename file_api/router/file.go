@@ -17,5 +17,7 @@ func FileRouter(R *gin.RouterGroup) {
 		File.GET("/download/:id", api.DownloadFile)
 		File.PUT("/desc/:id", api.UpdateFileDesc)
 		File.DELETE("/:id", api.DeleteFile)
+		File.PUT("/map/:id", api.UpdateFileMindMap)
+		File.GET("/map/:id", api.GetMindMap)
 	}
 }

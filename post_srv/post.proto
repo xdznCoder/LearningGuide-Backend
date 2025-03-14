@@ -46,6 +46,7 @@ message NoticeInfoResponse {
   int32 OwnerId = 3;
   int32 Type = 4;
   int32 PostId = 5;
+  string PostTitle = 6;
 }
 
 message NoticeListResponse {
