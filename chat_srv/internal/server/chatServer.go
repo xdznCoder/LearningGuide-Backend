@@ -28,11 +28,6 @@ func (s *ChatServer) UploadDocument(ctx context.Context, in *__ChatProto.CourseD
 	return l.UploadDocument(in)
 }
 
-func (s *ChatServer) SendSyncMessage(ctx context.Context, in *__ChatProto.UserMessage) (*__ChatProto.ChatModelResponse, error) {
-	l := logic.NewSendSyncMessageLogic(ctx, s.svcCtx)
-	return l.SendSyncMessage(in)
-}
-
 func (s *ChatServer) SendStreamMessage(in *__ChatProto.UserMessage, stream __ChatProto.Chat_SendStreamMessageServer) error {
 	l := logic.NewSendStreamMessageLogic(stream.Context(), s.svcCtx)
 	return l.SendStreamMessage(in, stream)

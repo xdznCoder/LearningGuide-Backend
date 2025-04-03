@@ -8,10 +8,14 @@ import (
 	"github.com/cloudwego/eino-ext/components/document/transformer/splitter/recursive"
 	arkEmbed "github.com/cloudwego/eino-ext/components/embedding/ark"
 	redisIndexer "github.com/cloudwego/eino-ext/components/indexer/redis"
+	"github.com/cloudwego/eino-ext/components/model/ark"
 	redisRetriever "github.com/cloudwego/eino-ext/components/retriever/redis"
 	"github.com/cloudwego/eino/components/document"
+	"github.com/cloudwego/eino/schema"
 	"github.com/redis/go-redis/v9"
 	"net/http"
+	net_url "net/url"
+	"path/filepath"
 )
 
 type RAGEngine struct {
@@ -19,6 +23,7 @@ type RAGEngine struct {
 	Retriever *redisRetriever.Retriever
 	Loader    *url.Loader
 	Splitter  document.Transformer
+	Chatter   *ark.ChatModel
 }
 
 func initRAG(c *config.Config, client *redis.Client) (*RAGEngine, error) {
@@ -59,7 +64,7 @@ func initRAG(c *config.Config, client *redis.Client) (*RAGEngine, error) {
 	}
 
 	l, err := url.NewLoader(ctx, &url.LoaderConfig{
-		Parser:         nil,
+		Parser:         &Parser{},
 		Client:         &http.Client{},
 		RequestBuilder: nil,
 	})
@@ -74,11 +79,17 @@ func initRAG(c *config.Config, client *redis.Client) (*RAGEngine, error) {
 		KeepType:    recursive.KeepTypeEnd,
 	})
 
+	ch, err := ark.NewChatModel(ctx, &ark.ChatModelConfig{
+		APIKey: c.ChatModel.APIKey,
+		Model:  c.ChatModel.ChatModel,
+	})
+
 	return &RAGEngine{
 		Indexer:   i,
 		Retriever: r,
 		Loader:    l,
 		Splitter:  s,
+		Chatter:   ch,
 	}, nil
 }
 
@@ -109,4 +120,28 @@ func (r *RAGEngine) InitVectorIndex(ctx context.Context, client *redis.Client, c
 		return err
 	}
 	return nil
+}
+
+func (r *RAGEngine) URLToFileInfo(ctx context.Context, URL string) (string, error) {
+	parsedURL, err := net_url.Parse(URL)
+	if err != nil {
+		return "", err
+	}
+
+	path := parsedURL.Path
+	filename := filepath.Base(path)
+
+	return net_url.QueryUnescape(filename)
+}
+
+func (r *RAGEngine) LoadURLFile(ctx context.Context, url string) ([]*schema.Document, error) {
+	n, err := r.URLToFileInfo(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx = context.WithValue(ctx, ContextFileNameKey, n)
+	return r.Loader.Load(ctx, document.Source{
+		URI: url,
+	})
 }

@@ -3,20 +3,17 @@ package api
 import (
 	"LearningGuide/file_api/forms"
 	"LearningGuide/file_api/global"
+	ChatProto "LearningGuide/file_api/proto/.ChatProto"
 	FileProto "LearningGuide/file_api/proto/.FileProto"
-	"LearningGuide/file_api/utils"
-	"context"
 	"fmt"
-	"github.com/OuterCyrex/ChatGLM_sdk"
 	"github.com/OuterCyrex/Gorra/GorraAPI"
 	handleGrpc "github.com/OuterCyrex/Gorra/GorraAPI/resp"
-	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -59,8 +56,6 @@ func NewSession(c *gin.Context) {
 		return
 	}
 
-	sessionManager.New(resp.Id)
-
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -75,8 +70,6 @@ func DeleteSession(c *gin.Context) {
 		})
 		return
 	}
-
-	sessionManager.Del(int32(Id))
 
 	_, err = global.FileSrvClient.DeleteSession(ctx, &FileProto.DeleteSessionRequest{Id: int32(Id)})
 	if err != nil {
@@ -117,36 +110,6 @@ func MessageList(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-type SessionManager struct {
-	lock    sync.Mutex
-	session map[int32]*ChatGLM_sdk.MessageContext
-}
-
-func NewSessionManager() *SessionManager {
-	return &SessionManager{
-		lock:    sync.Mutex{},
-		session: make(map[int32]*ChatGLM_sdk.MessageContext),
-	}
-}
-
-func (s *SessionManager) New(Id int32) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.session[Id] = ChatGLM_sdk.NewContext()
-}
-
-func (s *SessionManager) Del(Id int32) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	delete(s.session, Id)
-}
-
-var sessionManager *SessionManager
-
-func init() {
-	sessionManager = NewSessionManager()
-}
-
 func SendMessage(c *gin.Context) {
 	ctx := GorraAPI.RawContextWithSpan(c)
 
@@ -159,95 +122,101 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
-	// 参数校验
-	if _, ok := sessionManager.session[message.SessionId]; !ok {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "会话次数已达上限，请开始新的会话",
-		})
-		return
-	}
-
-	if len(*sessionManager.session[message.SessionId]) > 30 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "会话次数已达上限，请开始新的会话",
-		})
-
-		sessionManager.Del(message.SessionId)
-
-		return
-	}
-
-	// 模式选择
-
-	client := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
-
-	msgChannel := make(<-chan ChatGLM_sdk.Result)
-
-	var resp strings.Builder
+	var stream grpc.ServerStreamingClient[ChatProto.ChatModelResponse]
+	query := "你好"
 
 	switch message.Type {
 	case 1:
-		msgChannel = client.SendStream(sessionManager.session[message.SessionId], message.Content)
-	case 2:
-		fileId, err := strconv.Atoi(message.Content)
+		stream, err = global.ChatSrvClient.SendStreamMessage(ctx, &ChatProto.UserMessage{
+			CourseID:     message.CourseId,
+			SessionID:    message.SessionId,
+			Content:      message.Content,
+			FileURL:      "",
+			TemplateType: int32(TemplateTypeUserQuery),
+		})
 		if err != nil {
+			handleGrpc.HandleGrpcErrorToHttp(err, c)
+			return
+		}
+		query = message.Content
+	case 2:
+		iErr := error(nil)
+		fileId, iErr := strconv.Atoi(message.Content)
+		if iErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"msg": "无效文件ID",
 			})
 			return
 		}
 
-		resp, err := getFileInfo(ctx, fileId)
+		resp, iErr := getFileInfo(ctx, fileId)
 
-		if err != nil {
+		if iErr != nil {
 			handleGrpc.HandleGrpcErrorToHttp(err, c)
 			return
 		}
 
-		ossClient := getOssClient(global.ServerConfig.AliyunOss)
+		url, iErr := OssClient.FileURL(resp.OssUrl, resp.FileName)
+		if iErr != nil {
+			handleGrpc.HandleGrpcErrorToHttp(err, c)
+			return
+		}
 
-		result, err := ossClient.GetObject(context.TODO(), &oss.GetObjectRequest{
-			Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
-			Key:    oss.Ptr(resp.OssUrl),
+		if _, err = global.FileSrvClient.NewMessage(ctx, &FileProto.NewMessageRequest{
+			Content:   url,
+			Type:      int32(message.Type),
+			SessionId: message.SessionId,
+			Speaker:   "user",
+		}); err != nil {
+			handleGrpc.HandleGrpcErrorToHttp(err, c)
+			return
+		}
+
+		if _, err = global.FileSrvClient.NewMessage(ctx, &FileProto.NewMessageRequest{
+			Content:   "我已收到文件，请您询问关于文件的任何问题",
+			Type:      1,
+			SessionId: message.SessionId,
+			Speaker:   "assistant",
+		}); err != nil {
+			handleGrpc.HandleGrpcErrorToHttp(err, c)
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"msg": "文件上传成功",
 		})
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"msg": "服务器内部错误",
-			})
-			zap.S().Errorf("get object from oss failed: %v", err)
-			return
-		}
-
-		file, err := utils.ReadFile(result.Body, resp.FileName)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"msg": "服务器内部错误",
-			})
-			zap.S().Errorf("read from file failed: %v", err)
-			return
-		}
-
-		msgChannel = client.SendStream(sessionManager.session[message.SessionId], file)
+		return
 	}
 
-	for words := range msgChannel {
-		if len(words.Message) > 0 {
+	if stream == nil {
+		return
+	}
 
-			content := words.Message[0].Content
+	var result strings.Builder
 
-			resp.WriteString(content)
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
 
-			_, _ = fmt.Fprintf(c.Writer, "data: %s\n", content)
-			if flusher, ok := c.Writer.(http.Flusher); ok {
-				flusher.Flush()
-			}
-			time.Sleep(100 * time.Millisecond)
+	for {
+		output, iErr := stream.Recv()
+		if iErr == io.EOF {
+			break
+		} else if iErr != nil {
+			handleGrpc.HandleGrpcErrorToHttp(err, c)
+			return
 		}
+
+		_, _ = fmt.Fprintf(c.Writer, "data: %s\n", output.Content)
+		result.WriteString(output.Content)
+		if flusher, ok := c.Writer.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	if _, err = global.FileSrvClient.NewMessage(ctx, &FileProto.NewMessageRequest{
-		Content:   message.Content,
+		Content:   query,
 		Type:      int32(message.Type),
 		SessionId: message.SessionId,
 		Speaker:   "user",
@@ -257,7 +226,7 @@ func SendMessage(c *gin.Context) {
 	}
 
 	_, err = global.FileSrvClient.NewMessage(ctx, &FileProto.NewMessageRequest{
-		Content:   resp.String(),
+		Content:   result.String(),
 		Type:      int32(message.Type),
 		SessionId: message.SessionId,
 		Speaker:   "assistant",

@@ -1,27 +1,21 @@
 package api
 
 import (
-	"LearningGuide/file_api/config"
 	"LearningGuide/file_api/global"
+	ChatProto "LearningGuide/file_api/proto/.ChatProto"
 	FileProto "LearningGuide/file_api/proto/.FileProto"
-	"LearningGuide/file_api/utils"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/OuterCyrex/ChatGLM_sdk"
 	"github.com/OuterCyrex/Gorra/GorraAPI"
 	handleGrpc "github.com/OuterCyrex/Gorra/GorraAPI/resp"
-	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
-	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss/credentials"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"net/http"
-	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"time"
 )
@@ -108,20 +102,9 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
-	client := getOssClient(global.ServerConfig.AliyunOss)
+	ossName := fmt.Sprintf("%d-%d-%s", userId, courseId, fileHeader.Filename)
 
-	uuid := generateUniqueID(fileHeader.Filename, userId, courseId)
-
-	request := &oss.PutObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
-		Key:    oss.Ptr(uuid),
-		Body:   file,
-		Metadata: map[string]string{
-			"Content-Disposition": `attachment; filename="` + fileHeader.Filename + `"`,
-		},
-	}
-
-	_, err = client.PutObject(context.TODO(), request)
+	err = OssClient.Upload(ossName, fileHeader.Filename, file)
 
 	if err != nil {
 		zap.S().Errorf("文件上传失败: %v", err)
@@ -131,45 +114,11 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
-	glm := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
-
-	file, err = fileHeader.Open()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "无效的文件类型",
-		})
-		return
-	}
-
-	content, err := utils.ReadFile(file, fileHeader.Filename)
-	if errors.Is(err, utils.ErrInvalidType) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": fmt.Sprintf("无效的文件类型: %s", path.Ext(fileHeader.Filename)),
-		})
-		return
-	} else if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "文件上传失败",
-		})
-		zap.S().Errorf("read from file failed: %v", err)
-		return
-	}
-
-	descId, err := glm.SendAsync(ChatGLM_sdk.NewContext(), content+getPrompt())
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "解析文件失败",
-		})
-		return
-	}
-
 	resp, err := global.FileSrvClient.CreateFile(ctx, &FileProto.CreateFileRequest{
 		FileName: fileHeader.Filename,
 		FileType: filepath.Ext(fileHeader.Filename),
 		FileSize: fileHeader.Size,
-		OssUrl:   uuid,
-		Desc:     descId,
+		OssUrl:   ossName,
 		UserId:   int32(userId),
 		CourseId: int32(courseId),
 	})
@@ -191,46 +140,6 @@ func UploadFile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"id": resp.Id,
-	})
-}
-
-func GetFileDesc(c *gin.Context) {
-	ctx := GorraAPI.RawContextWithSpan(c)
-
-	id := c.Param("id")
-
-	fileId, err := strconv.Atoi(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "无效路径参数",
-		})
-		return
-	}
-
-	resp, err := getFileInfo(ctx, fileId)
-	if err != nil {
-		handleGrpc.HandleGrpcErrorToHttp(err, c)
-		return
-	}
-
-	glm := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
-	Result := glm.GetAsyncMessage(ChatGLM_sdk.NewContext(), resp.Desc)
-
-	if errors.Is(Result.Error, ChatGLM_sdk.ErrResultProcessing) {
-		c.JSON(http.StatusAccepted, gin.H{
-			"msg": "GLM正在生成中",
-		})
-		return
-	} else if Result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("get result from glm failed: %v", Result.Error)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"desc": Result.Message[0].Content,
 	})
 }
 
@@ -277,31 +186,15 @@ func DownloadFile(c *gin.Context) {
 		return
 	}
 
-	client := getOssClient(global.ServerConfig.AliyunOss)
-
-	expiration := time.Now().Add(1 * time.Hour)
-
-	req := &oss.GetObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
-		Key:    oss.Ptr(resp.OssUrl),
-		RequestCommon: oss.RequestCommon{
-			Parameters: map[string]string{
-				"response-content-disposition": `attachment; filename="` + resp.FileName + `"`,
-			},
-		},
-	}
-
-	signedURL, err := client.Presign(context.TODO(), req, oss.PresignExpiration(expiration))
-
+	url, err := OssClient.FileURL(resp.OssUrl, resp.FileName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("get presign url from oss failed: %v", err)
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
 		return
 	}
 
-	c.JSON(http.StatusOK, signedURL)
+	c.JSON(http.StatusOK, gin.H{
+		"url": url,
+	})
 }
 
 func UpdateFileDesc(c *gin.Context) {
@@ -324,46 +217,25 @@ func UpdateFileDesc(c *gin.Context) {
 		return
 	}
 
-	client := getOssClient(global.ServerConfig.AliyunOss)
-
-	req := &oss.GetObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
-		Key:    oss.Ptr(resp.OssUrl),
-	}
-
-	result, err := client.GetObject(context.TODO(), req)
+	url, err := OssClient.FileURL(resp.OssUrl, resp.FileName)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("get object from oss failed: %v", err)
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
 		return
 	}
 
-	file, err := utils.ReadFile(result.Body, resp.FileName)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("read from file failed: %v", err)
-		return
-	}
+	stream, err := global.ChatSrvClient.SendStreamMessage(ctx, &ChatProto.UserMessage{
+		CourseID:     resp.CourseId,
+		Content:      "",
+		FileURL:      url,
+		TemplateType: int32(TemplateTypeFileDescribeGenerate),
+	})
 
-	glm := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
-
-	descId, err := glm.SendAsync(ChatGLM_sdk.NewContext(), file+getPrompt())
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "解析文件失败",
-		})
-		return
-	}
+	result, err := ToString(stream)
 
 	_, err = global.FileSrvClient.UpdateFile(ctx, &FileProto.UpdateFileRequest{
 		Id:   int32(fileId),
-		Desc: descId,
+		Desc: result,
 	})
 
 	if err != nil {
@@ -374,7 +246,7 @@ func UpdateFileDesc(c *gin.Context) {
 	global.RDB.Del(context.Background(), fmt.Sprintf("%d", fileId))
 
 	c.JSON(http.StatusOK, gin.H{
-		"Desc": descId,
+		"Desc": result,
 	})
 }
 
@@ -406,12 +278,7 @@ func DeleteFile(c *gin.Context) {
 
 	global.RDB.Del(ctx, fmt.Sprintf("%d", fileId))
 
-	client := getOssClient(global.ServerConfig.AliyunOss)
-
-	_, err = client.DeleteObject(ctx, &oss.DeleteObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
-		Key:    oss.Ptr(resp.OssUrl),
-	})
+	err = OssClient.Delete(resp.OssUrl)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -444,46 +311,27 @@ func UpdateFileMindMap(c *gin.Context) {
 		return
 	}
 
-	client := getOssClient(global.ServerConfig.AliyunOss)
-
-	req := &oss.GetObjectRequest{
-		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.FileBucketName),
-		Key:    oss.Ptr(resp.OssUrl),
-	}
-
-	result, err := client.GetObject(context.TODO(), req)
+	url, err := OssClient.FileURL(resp.OssUrl, resp.FileName)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("get object from oss failed: %v", err)
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
 		return
 	}
 
-	file, err := utils.ReadFile(result.Body, resp.FileName)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("read from file failed: %v", err)
-		return
-	}
+	stream, err := global.ChatSrvClient.SendStreamMessage(ctx, &ChatProto.UserMessage{
+		CourseID:     resp.CourseId,
+		Content:      "",
+		FileURL:      url,
+		TemplateType: int32(TemplateTypeMindMapGenerate),
+	})
 
-	glm := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
+	result, err := ToString(stream)
 
-	glmId, err := glm.SendAsync(ChatGLM_sdk.NewContext(), file+getMindMapPrompt())
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "解析文件失败",
-		})
-		return
-	}
+	mindMap := transResultToStringJSON(result)
 
 	_, err = global.FileSrvClient.UpdateFile(ctx, &FileProto.UpdateFileRequest{
 		Id:      int32(fileId),
-		MindMap: glmId,
+		MindMap: mindMap,
 	})
 
 	if err != nil {
@@ -494,62 +342,8 @@ func UpdateFileMindMap(c *gin.Context) {
 	global.RDB.Del(context.Background(), fmt.Sprintf("%d", fileId))
 
 	c.JSON(http.StatusOK, gin.H{
-		"glm_id": glmId,
+		"mind_map": mindMap,
 	})
-}
-
-func GetMindMap(c *gin.Context) {
-
-	ctx := GorraAPI.RawContextWithSpan(c)
-
-	fileId, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "无效的路径参数",
-		})
-		return
-	}
-
-	resp, err := getFileInfo(ctx, fileId)
-	if err != nil {
-		handleGrpc.HandleGrpcErrorToHttp(err, c)
-		return
-	}
-
-	if resp.MindMap == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "尚未生成思维导图",
-		})
-		return
-	}
-
-	glm := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
-	Result := glm.GetAsyncMessage(ChatGLM_sdk.NewContext(), resp.MindMap)
-
-	if errors.Is(Result.Error, ChatGLM_sdk.ErrResultProcessing) {
-		c.JSON(http.StatusAccepted, gin.H{
-			"msg": "GLM正在生成中",
-		})
-		return
-	} else if Result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("get result from glm failed: %v", Result.Error)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"mind_map": transResultToStringJSON(Result),
-	})
-}
-
-func getOssClient(config config.OssConfig) *oss.Client {
-	cfg := oss.LoadDefaultConfig().WithCredentialsProvider(
-		credentials.NewStaticCredentialsProvider(config.AccessKey, config.SecretKey, "")).
-		WithRegion(config.Region)
-
-	return oss.NewClient(cfg)
 }
 
 func getFileInfo(ctx context.Context, id int) (*FileProto.FileInfoResponse, error) {
@@ -584,34 +378,4 @@ func getFileInfo(ctx context.Context, id int) (*FileProto.FileInfoResponse, erro
 	}
 
 	return &fileInfo, nil
-}
-
-func getPrompt() string {
-	return `请简要分析一下上述内容，回答的字数限制在500字左右`
-}
-
-func getMindMapPrompt() string {
-	return `请在分析上述内容后，返回jsmind可以渲染的json内容，不要超过字数限制，只返回jsmind可渲染的json代码块即可，一定要jsmind可渲染`
-}
-
-func generateUniqueID(fileName string, userId int, courseId int) string {
-	return fmt.Sprintf("%d-%d-%s", userId, courseId, fileName)
-}
-
-func transResultToStringJSON(result ChatGLM_sdk.Result) string {
-	pattern := "```json\\s*({[\\s\\S]*?})\\s*```"
-
-	re := regexp.MustCompile(pattern)
-
-	matches := re.FindStringSubmatch(result.Message[0].Content)
-
-	var output string
-
-	if matches == nil {
-		output = result.Message[0].Content
-	} else {
-		output = matches[1]
-	}
-
-	return output
 }

@@ -2,6 +2,7 @@ package global
 
 import (
 	"LearningGuide/file_api/config"
+	ChatProto "LearningGuide/file_api/proto/.ChatProto"
 	FileProto "LearningGuide/file_api/proto/.FileProto"
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/viper"
@@ -12,6 +13,7 @@ var (
 	ServerConfig  config.MainConfig
 	RDB           redis.Client
 	FileSrvClient FileProto.FileClient
+	ChatSrvClient ChatProto.ChatClient
 )
 
 func InitConfig(path string) {

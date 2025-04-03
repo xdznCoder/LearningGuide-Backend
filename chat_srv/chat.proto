@@ -11,6 +11,7 @@ message Empty{}
 
 message UserMessage {
   int32 CourseID = 1;
+  int32 SessionID = 5;
   string Content = 2;
   string FileURL = 3;
   int32 TemplateType = 4;
@@ -22,6 +23,5 @@ message ChatModelResponse {
 
 service Chat {
   rpc UploadDocument(CourseDocument) returns (Empty);
-  rpc SendSyncMessage(UserMessage) returns (ChatModelResponse);
   rpc SendStreamMessage(UserMessage) returns (stream ChatModelResponse);
 }

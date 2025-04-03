@@ -20,7 +20,6 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Chat_UploadDocument_FullMethodName    = "/chat.Chat/UploadDocument"
-	Chat_SendSyncMessage_FullMethodName   = "/chat.Chat/SendSyncMessage"
 	Chat_SendStreamMessage_FullMethodName = "/chat.Chat/SendStreamMessage"
 )
 
@@ -29,7 +28,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChatClient interface {
 	UploadDocument(ctx context.Context, in *CourseDocument, opts ...grpc.CallOption) (*Empty, error)
-	SendSyncMessage(ctx context.Context, in *UserMessage, opts ...grpc.CallOption) (*ChatModelResponse, error)
 	SendStreamMessage(ctx context.Context, in *UserMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatModelResponse], error)
 }
 
@@ -45,16 +43,6 @@ func (c *chatClient) UploadDocument(ctx context.Context, in *CourseDocument, opt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Chat_UploadDocument_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *chatClient) SendSyncMessage(ctx context.Context, in *UserMessage, opts ...grpc.CallOption) (*ChatModelResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ChatModelResponse)
-	err := c.cc.Invoke(ctx, Chat_SendSyncMessage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +73,6 @@ type Chat_SendStreamMessageClient = grpc.ServerStreamingClient[ChatModelResponse
 // for forward compatibility.
 type ChatServer interface {
 	UploadDocument(context.Context, *CourseDocument) (*Empty, error)
-	SendSyncMessage(context.Context, *UserMessage) (*ChatModelResponse, error)
 	SendStreamMessage(*UserMessage, grpc.ServerStreamingServer[ChatModelResponse]) error
 	mustEmbedUnimplementedChatServer()
 }
@@ -99,9 +86,6 @@ type UnimplementedChatServer struct{}
 
 func (UnimplementedChatServer) UploadDocument(context.Context, *CourseDocument) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UploadDocument not implemented")
-}
-func (UnimplementedChatServer) SendSyncMessage(context.Context, *UserMessage) (*ChatModelResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendSyncMessage not implemented")
 }
 func (UnimplementedChatServer) SendStreamMessage(*UserMessage, grpc.ServerStreamingServer[ChatModelResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method SendStreamMessage not implemented")
@@ -145,24 +129,6 @@ func _Chat_UploadDocument_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Chat_SendSyncMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UserMessage)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ChatServer).SendSyncMessage(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Chat_SendSyncMessage_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChatServer).SendSyncMessage(ctx, req.(*UserMessage))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Chat_SendStreamMessage_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(UserMessage)
 	if err := stream.RecvMsg(m); err != nil {
@@ -184,10 +150,6 @@ var Chat_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UploadDocument",
 			Handler:    _Chat_UploadDocument_Handler,
-		},
-		{
-			MethodName: "SendSyncMessage",
-			Handler:    _Chat_SendSyncMessage_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -12,7 +12,7 @@ func NounRouter(R *gin.RouterGroup) {
 	{
 		File.POST("", api.NewNoun)
 		File.GET("/list", api.NounList)
-		File.GET("/desc/:id", api.GetNounDesc)
+		File.GET("/:id", api.GetNounDetail)
 		File.DELETE("/:id", api.DeleteNoun)
 	}
 }

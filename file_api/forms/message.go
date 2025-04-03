@@ -6,6 +6,7 @@ type CreateSessionForm struct {
 
 type SendMessageForm struct {
 	SessionId int32  `json:"session_id" binding:"required,min=0"`
+	CourseId  int32  `json:"course_id" binding:"required,min=0"`
 	Content   string `json:"content" binding:"required"`
 	Type      int    `json:"type" binding:"required"`
 }

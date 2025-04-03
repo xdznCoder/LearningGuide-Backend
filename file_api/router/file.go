@@ -12,12 +12,10 @@ func FileRouter(R *gin.RouterGroup) {
 	{
 		File.POST("/upload", api.UploadFile)
 		File.GET("/list", api.FileList)
-		File.GET("/desc/:id", api.GetFileDesc)
 		File.GET("/detail/:id", api.GetFileDetail)
 		File.GET("/download/:id", api.DownloadFile)
 		File.PUT("/desc/:id", api.UpdateFileDesc)
 		File.DELETE("/:id", api.DeleteFile)
 		File.PUT("/map/:id", api.UpdateFileMindMap)
-		File.GET("/map/:id", api.GetMindMap)
 	}
 }

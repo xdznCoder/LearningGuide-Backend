@@ -10,7 +10,6 @@ import (
 func ExerciseRouter(R *gin.RouterGroup) {
 	Exercise := R.Group("/exer").Use(middlewares.TracerMiddleware(opentracing.GlobalTracer()))
 	{
-		Exercise.POST("/generate", api.GenerateExercise)
 		Exercise.POST("", api.NewExercise)
 		Exercise.GET("/list", api.ExerciseList)
 		Exercise.GET("/:id", api.GetExercise)

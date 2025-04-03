@@ -3,34 +3,31 @@ package api
 import (
 	"LearningGuide/file_api/forms"
 	"LearningGuide/file_api/global"
+	ChatProto "LearningGuide/file_api/proto/.ChatProto"
 	FileProto "LearningGuide/file_api/proto/.FileProto"
-	"encoding/json"
 	"errors"
-	"github.com/OuterCyrex/ChatGLM_sdk"
 	"github.com/OuterCyrex/Gorra/GorraAPI"
 	handleGrpc "github.com/OuterCyrex/Gorra/GorraAPI/resp"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"net/http"
-	"regexp"
 	"strconv"
 )
 
 func ExerciseList(c *gin.Context) {
 	ctx := GorraAPI.RawContextWithSpan(c)
 
-	pageSize, err := strconv.Atoi(c.DefaultQuery("pageSize", "0"))
-	pageNum, err := strconv.Atoi(c.DefaultQuery("pageNum", "0"))
-	courseId, err := strconv.Atoi(c.DefaultQuery("course_id", "0"))
-	isRight := c.DefaultQuery("is_right", "")
-	question := c.DefaultQuery("question", "")
-
-	if err != nil {
+	pageSize, err1 := strconv.Atoi(c.DefaultQuery("pageSize", "0"))
+	pageNum, err2 := strconv.Atoi(c.DefaultQuery("pageNum", "0"))
+	courseId, err3 := strconv.Atoi(c.DefaultQuery("course_id", "0"))
+	if errors.Join(err1, err2, err3) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"msg": "无效的查询参数",
 		})
 		return
 	}
+	isRight := c.DefaultQuery("is_right", "")
+	question := c.DefaultQuery("question", "")
 
 	switch isRight {
 	case "":
@@ -58,73 +55,6 @@ func ExerciseList(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func GenerateExercise(c *gin.Context) {
-	ctx := GorraAPI.RawContextWithSpan(c)
-
-	exer := forms.GenerateExerciseForms{}
-
-	err := c.ShouldBindJSON(&exer)
-	if err != nil {
-		handleGrpc.HandleValidatorError(err, c)
-		return
-	}
-
-	if len(exer.FileIds) > 10 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"msg": "文件最多可选10个",
-		})
-		return
-	}
-
-	var messageCtx *ChatGLM_sdk.MessageContext
-
-	if len(exer.FileIds) == 0 {
-		var ids []int32
-
-		resp, err := global.FileSrvClient.FileList(ctx, &FileProto.FileFilterRequest{
-			PageNum:  0,
-			PageSize: 10,
-			CourseId: exer.CourseId,
-		})
-		if err != nil {
-			handleGrpc.HandleGrpcErrorToHttp(err, c)
-			return
-		}
-
-		for _, v := range resp.Data {
-			ids = append(ids, v.Id)
-		}
-
-		messageCtx, err = getFileContext(ctx, ids)
-		if err != nil {
-			handleGrpc.HandleGrpcErrorToHttp(err, c)
-			return
-		}
-	} else {
-		messageCtx, err = getFileContext(ctx, exer.FileIds)
-		if err != nil {
-			handleGrpc.HandleGrpcErrorToHttp(err, c)
-			return
-		}
-	}
-
-	client := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
-
-	id, err := client.SendAsync(messageCtx, getExercisePrompt())
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("get async id from glm failed: %v", err)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"glm_result_id": id,
-	})
-}
-
 func NewExercise(c *gin.Context) {
 	ctx := GorraAPI.RawContextWithSpan(c)
 
@@ -137,20 +67,20 @@ func NewExercise(c *gin.Context) {
 		return
 	}
 
-	client := ChatGLM_sdk.NewClient(global.ServerConfig.ChatGLM.AccessKey)
+	stream, err := global.ChatSrvClient.SendStreamMessage(ctx, &ChatProto.UserMessage{
+		CourseID:     newExerForms.CourseId,
+		TemplateType: int32(TemplateTypeExerciseGenerate),
+	})
 
-	result := client.GetAsyncMessage(ChatGLM_sdk.NewContext(), newExerForms.ResultId)
-
-	if errors.Is(result.Error, ChatGLM_sdk.ErrResultProcessing) {
-		c.JSON(http.StatusAccepted, gin.H{
-			"msg": "GLM正在生成中",
-		})
+	if err != nil {
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
 		return
-	} else if result.Error != nil || len(result.Message) <= 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg": "服务器内部错误",
-		})
-		zap.S().Errorf("get result from glm failed: %v", result.Error)
+	}
+
+	result, err := ToString(stream)
+
+	if err != nil {
+		handleGrpc.HandleGrpcErrorToHttp(err, c)
 		return
 	}
 
@@ -259,59 +189,4 @@ func DeleteExercise(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"msg": "删除成功",
 	})
-}
-
-func transResultToExercise(result ChatGLM_sdk.Result) (exercise, error) {
-	pattern := "```json\\s*({[\\s\\S]*?})\\s*```"
-
-	re := regexp.MustCompile(pattern)
-
-	matches := re.FindStringSubmatch(result.Message[0].Content)
-
-	var output string
-
-	if matches == nil {
-		output = result.Message[0].Content
-	} else {
-		output = matches[1]
-	}
-
-	var question exercise
-
-	err := json.Unmarshal([]byte(output), &question)
-	if err != nil {
-		return exercise{}, err
-	}
-
-	return question, nil
-}
-
-type exercise struct {
-	Question string      `json:"question"`
-	Sections SectionsSet `json:"sections"`
-	Answer   string      `json:"answer"`
-	Reason   string      `json:"reason"`
-}
-
-type SectionsSet struct {
-	A string `json:"A"`
-	B string `json:"B"`
-	C string `json:"C"`
-	D string `json:"D"`
-}
-
-func getExercisePrompt() string {
-	var template = `{
-  "question": "问题的内容",
-  "sections": {
-    "A": "a选项",
-    "B": "b选项",
-    "C": "c选项",
-    "D": "d选项"
-  },
-  "answer": "本题目的答案",
-  "reason": "选择该答案的原因"
-}`
-
-	return "请根据所给的文件内容出一个相关练习题，要求题目以该JSON格式返回，JSON格式为：" + template + "不要回复任何多余的话，只需要JSON内容，不要出代码题，答案一定要正确"
 }

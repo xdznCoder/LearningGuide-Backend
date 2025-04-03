@@ -9,6 +9,7 @@ type Config struct {
 	zrpc.RpcServerConf
 	Consul    consul.Conf
 	ChatModel ChatModelConfig `json:"chatModelConfig"`
+	FileSrv   string          `json:"FileSrv"`
 }
 
 type ChatModelConfig struct {

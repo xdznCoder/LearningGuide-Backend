@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
+	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss/credentials"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"net/http"
@@ -34,7 +35,14 @@ func UploadPictures(c *gin.Context) {
 		return
 	}
 
-	client := getOssClient(global.ServerConfig.AliyunOss)
+	cfg := oss.LoadDefaultConfig().WithCredentialsProvider(
+		credentials.NewStaticCredentialsProvider(
+			global.ServerConfig.AliyunOss.AccessKey,
+			global.ServerConfig.AliyunOss.SecretKey,
+			"")).
+		WithRegion(global.ServerConfig.AliyunOss.Region)
+
+	client := oss.NewClient(cfg)
 
 	request := &oss.PutObjectRequest{
 		Bucket: oss.Ptr(global.ServerConfig.AliyunOss.PictureBucketName),

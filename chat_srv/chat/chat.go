@@ -21,7 +21,6 @@ type (
 
 	Chat interface {
 		UploadDocument(ctx context.Context, in *CourseDocument, opts ...grpc.CallOption) (*Empty, error)
-		SendSyncMessage(ctx context.Context, in *UserMessage, opts ...grpc.CallOption) (*ChatModelResponse, error)
 		SendStreamMessage(ctx context.Context, in *UserMessage, opts ...grpc.CallOption) (__ChatProto.Chat_SendStreamMessageClient, error)
 	}
 
@@ -39,11 +38,6 @@ func NewChat(cli zrpc.Client) Chat {
 func (m *defaultChat) UploadDocument(ctx context.Context, in *CourseDocument, opts ...grpc.CallOption) (*Empty, error) {
 	client := __ChatProto.NewChatClient(m.cli.Conn())
 	return client.UploadDocument(ctx, in, opts...)
-}
-
-func (m *defaultChat) SendSyncMessage(ctx context.Context, in *UserMessage, opts ...grpc.CallOption) (*ChatModelResponse, error) {
-	client := __ChatProto.NewChatClient(m.cli.Conn())
-	return client.SendSyncMessage(ctx, in, opts...)
 }
 
 func (m *defaultChat) SendStreamMessage(ctx context.Context, in *UserMessage, opts ...grpc.CallOption) (__ChatProto.Chat_SendStreamMessageClient, error) {
