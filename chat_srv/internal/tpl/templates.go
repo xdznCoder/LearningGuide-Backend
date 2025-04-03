@@ -40,26 +40,28 @@ type TemplateMessage struct {
 }
 
 func (m internalMap) Get(ctx context.Context, tm TemplateMessage) ([]*schema.Message, error) {
-	tpls := []schema.MessagesTemplate{
-		schema.SystemMessage(m.m[tm.Type]),
-		schema.UserMessage("question: {{.content}}"),
-	}
 
 	if tm.Type == TemplateTypeUserQuery {
-		tpls = append(tpls, schema.MessagesPlaceholder("history", false))
-		temp := prompt.FromMessages(schema.GoTemplate, tpls...)
+		temp := prompt.FromMessages(schema.GoTemplate, []schema.MessagesTemplate{
+			schema.SystemMessage(m.m[tm.Type]),
+			schema.MessagesPlaceholder("history", true),
+			schema.UserMessage("{{.question}}"),
+		}...)
 		return temp.Format(ctx, map[string]any{
 			"documents": tm.Documents,
-			"content":   tm.Query,
-			"history":   tm.History,
 			"file":      tm.File,
+			"history":   tm.History,
+			"question":  tm.Query,
 		})
 	}
 
-	temp := prompt.FromMessages(schema.GoTemplate, tpls...)
+	temp := prompt.FromMessages(schema.GoTemplate, []schema.MessagesTemplate{
+		schema.SystemMessage(m.m[tm.Type]),
+		schema.UserMessage("{{.question}}"),
+	}...)
 	return temp.Format(ctx, map[string]any{
 		"documents": tm.Documents,
-		"content":   tm.Query,
+		"question":  tm.Query,
 	})
 }
 

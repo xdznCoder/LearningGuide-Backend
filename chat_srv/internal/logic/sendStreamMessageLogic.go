@@ -107,6 +107,7 @@ func (l *SendStreamMessageLogic) SendStreamMessage(in *__ChatProto.UserMessage, 
 		}
 
 		for _, h := range resp.Data {
+
 			switch h.Speaker {
 			case "user":
 				if h.Type == 2 {
@@ -126,19 +127,21 @@ func (l *SendStreamMessageLogic) SendStreamMessage(in *__ChatProto.UserMessage, 
 	mes, err := tpl.Map.Get(l.ctx, tpl.TemplateMessage{
 		Type:      tpl.TemplateType(in.TemplateType),
 		Documents: docs,
+		Query:     query,
 		History:   history,
 		File:      files,
 	})
+
 	if err != nil {
+		l.Errorf("get messages from template error: %v", err)
 		return status.Error(codes.Internal, err.Error())
 	}
 
 	output, err := l.svcCtx.RAG.Chatter.Stream(l.ctx, mes)
 	if err != nil {
+		l.Errorf("get stream return failed: %v", err)
 		return status.Error(codes.Internal, err.Error())
 	}
-
-	fmt.Println(query)
 
 	for {
 		o, iErr := output.Recv()
@@ -149,7 +152,6 @@ func (l *SendStreamMessageLogic) SendStreamMessage(in *__ChatProto.UserMessage, 
 		if iErr != nil {
 			return status.Error(codes.Internal, iErr.Error())
 		}
-		fmt.Println("data: ", o.Content)
 		iErr = stream.Send(&__ChatProto.ChatModelResponse{
 			Content: o.Content,
 		})
